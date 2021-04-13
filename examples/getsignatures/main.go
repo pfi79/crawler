@@ -23,7 +23,7 @@ const (
 )
 
 func main() {
-	engine, err := crawler.New("connection.yaml", crawler.WithAutoConnect(USER, ORG))
+	engine, err := crawler.New("connection.yaml", crawler.WithAutoConnect(USER, ORG, nil))
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -34,7 +34,6 @@ func main() {
 	}
 
 	listener := engine.ListenerForChannel(CHANNEL)
-
 	for blockevent := range listener {
 		block, err := blocklib.FromFabricBlock(blockevent.Block)
 		if err != nil {
