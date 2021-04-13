@@ -8,6 +8,7 @@ package crawler
 import (
 	"fmt"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/newity/crawler/parser"
 	"github.com/newity/crawler/storage"
@@ -18,7 +19,7 @@ type Option func(crawler *Crawler) error
 
 // WithAutoConnect connects crawler to all channels specified in connection profile
 // 'username' is a Fabric identity name and 'org' is a Fabric organization ti which the identity belongs
-func WithAutoConnect(username, org string) Option {
+func WithAutoConnect(username, org string, identity msp.SigningIdentity) Option {
 	return func(crawler *Crawler) error {
 		configBackend, err := crawler.sdk.Config()
 		if err != nil {
@@ -34,7 +35,11 @@ func WithAutoConnect(username, org string) Option {
 
 			var err error
 			for ch := range channelsMap {
-				crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithUser(username), fabsdk.WithOrg(org))
+				if identity != nil {
+					crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
+				} else {
+					crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithUser(username), fabsdk.WithOrg(org))
+				}
 				crawler.chCli[ch], err = channel.New(crawler.channelProvider)
 				return err
 			}
