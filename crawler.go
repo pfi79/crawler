@@ -34,6 +34,7 @@ import (
 	contextApi "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
@@ -128,7 +129,7 @@ func (c *Crawler) Connect(ch, username, org string) error {
 }
 
 // ConnectWithIdentity connects crawler to channel 'ch' as passed signing identity from specified organization
-func (c *Crawler) ConnectWithIdentity(ch, org string, identity msp.SigningIdentityInfo) error {
+func (c *Crawler) ConnectWithIdentity(ch, org string, identity msp.SigningIdentity) error {
 	var err error
 	c.channelProvider = c.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
 	c.chCli[ch], err = channel.New(c.channelProvider)
