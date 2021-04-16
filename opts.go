@@ -48,6 +48,14 @@ func WithAutoConnect(username, org string, identity msp.SigningIdentity) Option 
 	}
 }
 
+// WithSDK injects prepared *fabsdk.FabricSDK to the Crawler instance.
+func WithSDK(sdk *fabsdk.FabricSDK) Option {
+	return func(crawler *Crawler) error {
+		crawler.sdk = sdk
+		return nil
+	}
+}
+
 // WithParser injects a specific parser that satisfies the Parser interface to the Crawler instance.
 // If no parser is specified, the default parser ParserImpl will be used.
 func WithParser(p parser.Parser) Option {
