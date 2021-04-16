@@ -127,6 +127,14 @@ func (c *Crawler) Connect(ch, username, org string) error {
 	return err
 }
 
+// ConnectWithIdentity connects crawler to channel 'ch' as passed signing identity from specified organization
+func (c *Crawler) ConnectWithIdentity(ch, org string, identity msp.SigningIdentityInfo) error {
+	var err error
+	c.channelProvider = c.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
+	c.chCli[ch], err = channel.New(c.channelProvider)
+	return err
+}
+
 // Listen starts blocks listener starting from block with num 'from'.
 // All consumed blocks will be hadled by the provided parser (or default parser ParserImpl).
 func (c *Crawler) Listen(opts ...ListenOpt) error {
