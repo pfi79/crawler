@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	CHANNEL = "mychannel"
-	USER    = "User1"
-	ORG     = "Org1"
+	USER = "User1"
+	ORG  = "Org1"
 )
 
 func main() {
@@ -74,5 +73,23 @@ func readBlock(engine *crawler.Crawler, num int) {
 		}
 
 		fmt.Printf("Tx ID: %s\nCreation time: %s\n", txid, t.String())
+
+		// print rwset
+		actions, err := tx.Actions()
+		if err != nil {
+			panic(err)
+		}
+
+		for _, action := range actions {
+			rwsets, err := action.RWSets()
+			if err != nil {
+				panic(err)
+			}
+
+			for _, rw := range rwsets {
+				fmt.Println("readset", rw.KVRWSet.Reads)
+				fmt.Println("writeset", rw.KVRWSet.Writes)
+			}
+		}
 	}
 }
