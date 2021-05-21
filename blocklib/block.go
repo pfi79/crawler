@@ -383,6 +383,15 @@ func (b *Block) Txs() ([]Tx, error) {
 	return txs, nil
 }
 
+// TxsFromOrdererBlock returns transactions from orderer block without validation code and validation status, because odrerer ledger does not contain them.
+func (b *Block) TxsFromOrdererBlock() ([]Tx, error) {
+	var txs []Tx
+	for _, data := range b.Data {
+		txs = append(txs, Tx{Data: data})
+	}
+	return txs, nil
+}
+
 // LastConfig returns last configuration block index for provided block.
 func (b *Block) LastConfig() (uint64, error) {
 	lastConfig := &common.LastConfig{}
