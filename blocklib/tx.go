@@ -7,6 +7,7 @@ package blocklib
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/hyperledger/fabric-protos-go/common"
@@ -215,15 +216,19 @@ func (tx *Tx) CreatorSignatureHexString() (string, error) {
 	return hex.EncodeToString(envelope.Signature), err
 }
 
-// ChaincodeId returns peer.ChaincodeID (name, version and path) of the target chaincode.
+// ChaincodeId returns peer.ChaincodeID (name, version and path) of the target chaincode (only if it's type is common.HeaderType_ENDORSER_TRANSACTION).
 func (tx *Tx) ChaincodeId() (*peer.ChaincodeID, error) {
 	chhdr, err := tx.ChannelHeader()
 	if err != nil {
 		return nil, err
 	}
-	ccHeaderExt := &peer.ChaincodeHeaderExtension{}
-	err = proto.Unmarshal(chhdr.Extension, ccHeaderExt)
-	return ccHeaderExt.ChaincodeId, err
+	if chhdr.Type == int32(common.HeaderType_ENDORSER_TRANSACTION) {
+		ccHeaderExt := &peer.ChaincodeHeaderExtension{}
+		err = proto.Unmarshal(chhdr.Extension, ccHeaderExt)
+		return ccHeaderExt.ChaincodeId, err
+	} else {
+		return nil, fmt.Errorf("Not an endorser transaction type (type code %d)", chhdr.Type)
+	}
 }
 
 // Epoch returns the epoch in which this header was generated, where epoch is defined based on block height
