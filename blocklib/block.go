@@ -99,6 +99,11 @@ func FromFabricBlock(block *common.Block) (*Block, error) {
 
 	headerHash := sha256.Sum256(BlockHeaderBytes(block.Header))
 
+	filter := block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
+	if filter == nil {
+		filter = block.Metadata.Metadata[1] // for HLF 1.x compatibility
+	}
+
 	return &Block{
 		Data:       block.Data.Data,
 		number:     block.Header.Number,
@@ -107,7 +112,7 @@ func FromFabricBlock(block *common.Block) (*Block, error) {
 		prevhash:   block.Header.PreviousHash,
 		datahash:   block.Header.DataHash,
 		headerhash: headerHash[:],
-		txsFilter:  block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER],
+		txsFilter:  filter,
 		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
 	}, nil
 }
@@ -174,6 +179,11 @@ func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error)
 
 	headerHash := sha256.Sum256(BlockHeaderBytes(block.Header))
 
+	filter := block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
+	if filter == nil {
+		filter = block.Metadata.Metadata[1] // for HLF 1.x compatibility
+	}
+
 	return &Block{
 		Data:       block.Data.Data,
 		number:     block.Header.Number,
@@ -182,7 +192,72 @@ func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error)
 		prevhash:   block.Header.PreviousHash,
 		datahash:   block.Header.DataHash,
 		headerhash: headerHash[:],
-		txsFilter:  block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER],
+		txsFilter:  filter,
+		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
+	}, nil
+}
+
+func FromBFTFabricBlockWithoutOrdererIdenities(block *common.Block) (*Block, error) {
+	metadata := &common.Metadata{}
+	err := proto.Unmarshal(block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES], metadata)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling metadata from block at index [%s]", common.BlockMetadataIndex_SIGNATURES)
+	}
+
+	var blockSignatures []BlockSignature
+	for _, metadataSignature := range metadata.Signatures {
+		sigHdr := &common.SignatureHeader{}
+		if err := proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
+			return nil, errors.Wrap(err, "error unmarshaling SignatureHeader")
+		}
+
+		creator := &msp.SerializedIdentity{}
+		if err = proto.Unmarshal(sigHdr.Creator, creator); err != nil {
+			return nil, err
+		}
+		blockSignatures = append(blockSignatures,
+			BlockSignature{
+				Cert:      nil,
+				MSPID:     "",
+				Signature: metadataSignature.Signature,
+				Nonce:     sigHdr.Nonce,
+			},
+		)
+	}
+
+	envelope := &common.Envelope{}
+	if err := proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
+		return nil, err
+	}
+
+	payload := &common.Payload{}
+	err = proto.Unmarshal(envelope.Payload, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	hdr := &common.ChannelHeader{}
+	err = proto.Unmarshal(payload.Header.ChannelHeader, hdr)
+	if err != nil {
+		return nil, err
+	}
+
+	headerHash := sha256.Sum256(BlockHeaderBytes(block.Header))
+
+	filter := block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
+	if filter == nil {
+		filter = block.Metadata.Metadata[1] // for HLF 1.x compatibility
+	}
+
+	return &Block{
+		Data:       block.Data.Data,
+		number:     block.Header.Number,
+		signatures: blockSignatures,
+		Metadata:   block.Metadata.Metadata,
+		prevhash:   block.Header.PreviousHash,
+		datahash:   block.Header.DataHash,
+		headerhash: headerHash[:],
+		txsFilter:  filter,
 		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
 	}, nil
 }
