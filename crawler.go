@@ -63,14 +63,11 @@ type Crawler struct {
 // New creates Crawler instance from HLF connection profile and returns pointer to it.
 // "connectionProfile" is a path to HLF connection profile
 func New(connectionProfile string, opts ...Option) (*Crawler, error) {
-	configprovider := config.FromFile(connectionProfile)
-
 	crawl := &Crawler{
-		chCli:          make(map[string]*channel.Client),
-		eventCli:       make(map[string]*event.Client),
-		notifiers:      make(map[string]<-chan *fab.BlockEvent),
-		registrations:  make(map[string]fab.Registration),
-		configProvider: configprovider,
+		chCli:         make(map[string]*channel.Client),
+		eventCli:      make(map[string]*event.Client),
+		notifiers:     make(map[string]<-chan *fab.BlockEvent),
+		registrations: make(map[string]fab.Registration),
 	}
 
 	var err error
@@ -81,7 +78,10 @@ func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 	}
 
 	if crawl.sdk == nil {
-		crawl.sdk, err = fabsdk.New(configprovider)
+		if crawl.configProvider == nil {
+			crawl.configProvider = config.FromFile(connectionProfile)
+		}
+		crawl.sdk, err = fabsdk.New(crawl.configProvider)
 		if err != nil {
 			return nil, err
 		}
