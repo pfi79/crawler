@@ -8,6 +8,7 @@ package crawler
 import (
 	"fmt"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/newity/crawler/parser"
@@ -52,6 +53,14 @@ func WithAutoConnect(username, org string, identity msp.SigningIdentity) Option 
 func WithSDK(sdk *fabsdk.FabricSDK) Option {
 	return func(crawler *Crawler) error {
 		crawler.sdk = sdk
+		return nil
+	}
+}
+
+// WithConfigProvider injects prepared core.ConfigProvider to the Crawler instance.
+func WithConfigProvider(configProvider core.ConfigProvider) Option {
+	return func(crawler *Crawler) error {
+		crawler.configProvider = configProvider
 		return nil
 	}
 }
