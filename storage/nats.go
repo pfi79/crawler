@@ -8,6 +8,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	stan "github.com/nats-io/stan.go"
 	log "github.com/sirupsen/logrus"
 	"sync"
@@ -16,7 +17,7 @@ import (
 type Nats struct {
 	Connection    stan.Conn
 	channels      []string
-	subscriptions []stan.Subscription
+	subscriptions []*stan.Subscription
 }
 
 func NewNats(clusterID, clientID string, opts ...stan.Option) (*Nats, error) {
@@ -43,7 +44,7 @@ func (n *Nats) Put(topic string, msg []byte) error {
 // Get reads one message from the topic and closes channel.
 func (n *Nats) Get(topic string) ([]byte, error) {
 	var data []byte
-	sub, err := n.Connection.QueueSubscribe(topic, topic, func(m *stan.Msg) {
+	sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
 		data = m.Data
 		if err := m.Ack(); err != nil {
 			log.Errorf("failed to ack message, %v", err)
@@ -60,7 +61,7 @@ func (n *Nats) GetStream(topic string) (<-chan []byte, <-chan error) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		sub, err := n.Connection.QueueSubscribe(topic, topic, func(m *stan.Msg) {
+		sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
 			ch <- m.Data
 			if err := m.Ack(); err != nil {
 				log.Errorf("failed to ack message, %v", err)
@@ -83,12 +84,31 @@ func (n *Nats) Delete(key string) error {
 // Close stops all running goroutines related to topics.
 func (n *Nats) Close() error {
 	for _, sub := range n.subscriptions {
-		if err := sub.Unsubscribe(); err != nil {
+		if err := (*sub).Unsubscribe(); err != nil {
 			return err
 		}
-		if err := sub.Close(); err != nil {
+		if err := (*sub).Close(); err != nil {
 			return err
 		}
 	}
 	return n.Connection.Close()
+}
+
+func SubscriptionMgr(conn stan.Conn, subject string, cb stan.MsgHandler, opts ...stan.SubscriptionOption) (*stan.Subscription, error) {
+	sub, err := conn.Subscribe(subject, cb, opts...)
+	if err != nil {
+		return nil, err
+	}
+	subptr := &sub
+	for {
+		if !sub.IsValid() {
+			fmt.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+			sub, err = conn.Subscribe(subject, cb, opts...)
+			if err != nil {
+				return nil, err
+			}
+			subptr = &sub
+		}
+	}
+	return subptr, nil
 }
