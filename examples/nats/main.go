@@ -8,6 +8,8 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/stan.go"
 	"github.com/newity/crawler"
 	"github.com/newity/crawler/storage"
 	"github.com/newity/crawler/storageadapter"
@@ -22,8 +24,26 @@ const (
 	NATS_URL   = "nats://0.0.0.0:4222"
 )
 
+var ConnStatuses = map[nats.Status]string{
+	0: "DISCONNECTED",
+	1: "CONNECTED",
+	2: "CLOSED",
+	3: "RECONNECTING",
+	4: "CONNECTING",
+	5: "DRAINING_SUBS",
+	6: "DRAINING_PUBS",
+}
+
+func ConnectionLostHandler() func(stan.Conn, error) {
+	return func(conn stan.Conn, err error) {
+		if conn.NatsConn() != nil {
+			logrus.Fatalf("connection to the NATS server is broken (status %s), error: %s", ConnStatuses[conn.NatsConn().Status()], err.Error())
+		}
+	}
+}
+
 func main() {
-	natsStorage, err := storage.NewNats(CLUSTER_ID, USER, NATS_URL, 10000000)
+	natsStorage, err := storage.NewNats(CLUSTER_ID, USER, stan.NatsURL(NATS_URL), stan.MaxPubAcksInflight(10000000), stan.Pings(1, 100), stan.SetConnectionLostHandler(ConnectionLostHandler()))
 	if err != nil {
 		logrus.Fatal(err)
 	}
