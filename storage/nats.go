@@ -20,13 +20,12 @@ type Nats struct {
 	subscriptions []*stan.Subscription
 }
 
-func NatsConnMonitor(nats *Nats, conn stan.Conn, clusterID, clientID string, opts ...stan.Option) {
-	var err error
+func NatsConnMonitor(nats *Nats, clusterID, clientID string, opts ...stan.Option) {
 	t := time.NewTicker(3 * time.Second)
 	for range t.C {
-		if conn.NatsConn() == nil {
+		if nats.Connection.NatsConn() == nil {
 			log.Warnf("reestablish connection to the NATS")
-			conn, err = stan.Connect(clusterID, clientID, opts...)
+			conn, err := stan.Connect(clusterID, clientID, opts...)
 			if err != nil {
 				log.Error(err)
 			}
