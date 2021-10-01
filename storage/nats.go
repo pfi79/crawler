@@ -8,10 +8,10 @@ package storage
 
 import (
 	"errors"
-	"fmt"
 	stan "github.com/nats-io/stan.go"
 	log "github.com/sirupsen/logrus"
 	"sync"
+	"time"
 )
 
 type Nats struct {
@@ -20,15 +20,35 @@ type Nats struct {
 	subscriptions []*stan.Subscription
 }
 
+func NatsConnMonitor(nats *Nats, conn stan.Conn, clusterID, clientID string, opts ...stan.Option) {
+	var err error
+	t := time.NewTicker(3 * time.Second)
+	for range t.C {
+		if conn.NatsConn() == nil {
+			log.Warnf("reestablish connection to the NATS")
+			conn, err = stan.Connect(clusterID, clientID, opts...)
+			if err != nil {
+				log.Error(err)
+			}
+			log.Info("connection to the NATS established")
+			nats.Connection = conn
+		}
+	}
+}
+
 func NewNats(clusterID, clientID string, opts ...stan.Option) (*Nats, error) {
 	conn, err := stan.Connect(clusterID, clientID, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Nats{
+	n := &Nats{
 		Connection: conn,
-	}, nil
+	}
+
+	go NatsConnMonitor(n, conn, clusterID, clientID, opts...)
+
+	return n, nil
 }
 
 func (n *Nats) InitChannelsStorage(channels []string) error {
@@ -100,15 +120,25 @@ func SubscriptionMgr(conn stan.Conn, subject string, cb stan.MsgHandler, opts ..
 		return nil, err
 	}
 	subptr := &sub
-	for {
-		if !sub.IsValid() {
-			fmt.Errorf("Subscription to %s is not valid, recreate subcription", subject)
-			sub, err = conn.Subscribe(subject, cb, opts...)
-			if err != nil {
-				return nil, err
+	t := time.NewTicker(3 * time.Second)
+	var validSub bool
+	go func() {
+		for range t.C {
+			if !sub.IsValid() {
+				validSub = false
+				log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+				sub, err = conn.Subscribe(subject, cb, opts...)
+				if err != nil {
+					panic(err)
+				}
+				subptr = &sub
+			} else {
+				if !validSub {
+					log.Infof("Subscription to %s restored", subject)
+				}
+				validSub = true
 			}
-			subptr = &sub
 		}
-	}
+	}()
 	return subptr, nil
 }
