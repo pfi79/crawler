@@ -45,7 +45,7 @@ func NewNats(clusterID, clientID string, opts ...stan.Option) (*Nats, error) {
 		Connection: conn,
 	}
 
-	go NatsConnMonitor(n, conn, clusterID, clientID, opts...)
+	go NatsConnMonitor(n, clusterID, clientID, opts...)
 
 	return n, nil
 }
