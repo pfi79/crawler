@@ -8,6 +8,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+
 	"github.com/newity/crawler"
 	"github.com/newity/crawler/storage"
 	"github.com/newity/crawler/storageadapter"
@@ -23,7 +24,10 @@ const (
 )
 
 func main() {
-	pubsub, err := storage.NewPubSub("hlf-newity", option.WithCredentialsFile(CREDSFILE))
+	pubsub, err := storage.NewPubSub(
+		"hlf-newity",
+		option.WithCredentialsFile(CREDSFILE),
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -33,7 +37,11 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	engine, err := crawler.New("connection.yaml", crawler.WithStorage(pubsub), crawler.WithStorageAdapter(storageadapter.NewQueueAdapter(pubsub)))
+	engine, err := crawler.New(
+		"connection.yaml",
+		crawler.WithStorage(pubsub),
+		crawler.WithStorageAdapter(storageadapter.NewQueueAdapter(pubsub)),
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -56,26 +64,42 @@ func main() {
 
 func readFromQueue(engine *crawler.Crawler, topic string) {
 	dataChan, errChan := engine.ReadStreamFromStorage(topic)
+
 	for {
 		select {
 		case data := <-dataChan:
-			logrus.Infof("block %d with hash %s and previous hash %s\n\nOrderers signed:\n", data.BlockNumber,
+			logrus.Infof(
+				"block %d with hash %s and previous hash %s\n\nOrderers signed:\n",
+				data.BlockNumber,
 				hex.EncodeToString(data.Datahash),
-				hex.EncodeToString(data.Prevhash))
+				hex.EncodeToString(data.Prevhash),
+			)
+
 			for _, signature := range data.BlockSignatures {
-				fmt.Printf("MSP ID: %s\nSignature: %s\nCertificate:\n%s\n", signature.MSPID, hex.EncodeToString(signature.Signature), string(signature.Cert))
+				fmt.Printf(
+					"MSP ID: %s\nSignature: %s\nCertificate:\n%s\n",
+					signature.MSPID,
+					hex.EncodeToString(signature.Signature),
+					string(signature.Cert),
+				)
 			}
+
 			for _, tx := range data.Txs {
 				t, err := tx.Timestamp()
 				if err != nil {
 					logrus.Error("failed to get timestamp", err)
 				}
+
 				txid, err := tx.TxId()
 				if err != nil {
 					logrus.Error("failed to get tx ID", err)
 				}
 
-				fmt.Printf("Tx ID: %s\nCreation time: %s\n", txid, t.String())
+				fmt.Printf(
+					"Tx ID: %s\nCreation time: %s\n",
+					txid,
+					t.String(),
+				)
 			}
 		case err := <-errChan:
 			logrus.Error(err)

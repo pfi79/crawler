@@ -8,10 +8,11 @@ package blocklib
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/gogo/protobuf/proto"
+	"testing"
+
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func GetActionFromBlock(pathToBlock string) (*Action, error) {
@@ -19,39 +20,58 @@ func GetActionFromBlock(pathToBlock string) (*Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	tx := txsvalid[0]
-	actions, err := tx.Actions()
+
+	t := txsvalid[0]
+
+	actions, err := t.Actions()
 	if err != nil {
 		return nil, err
 	}
+
 	return &actions[0], nil
 }
 
 func TestChaincodeActionPayload(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
+
 	ccActPayload := action.ChaincodeActionPayload()
 	assert.NotNil(t, ccActPayload.Action)
 	assert.NotNil(t, ccActPayload.ChaincodeProposalPayload)
 }
 
 func TestEndorsements(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
+
 	endorsements := action.Endorsements()
 
 	identity1 := &msp.SerializedIdentity{}
 	assert.NoError(t, proto.Unmarshal(endorsements[0].Endorser, identity1))
 	assert.Equal(t, "Org1MSP", identity1.Mspid)
-	assert.Equal(t, "30450221008b06e091f41a1e49d0876fca1c4afbbde7f3b4ae18fbca7a64502f4c7bea074a02206feb4a205e50203e214fccf1b8621c52d78340cdceb92a9f3c826c25174d4f44", hex.EncodeToString(endorsements[0].Signature))
+	assert.Equal(
+		t,
+		"30450221008b06e091f41a1e49d0876fca1c4afbbde7f3b4ae18fbca7a64502f4c7bea074a02206feb4a205e50203e214fccf1b8621c52d78340cdceb92a9f3c826c25174d4f44",
+		hex.EncodeToString(endorsements[0].Signature),
+	)
 
 	identity2 := &msp.SerializedIdentity{}
 	assert.NoError(t, proto.Unmarshal(endorsements[1].Endorser, identity2))
 	assert.Equal(t, "Org2MSP", identity2.Mspid)
-	assert.Equal(t, "3045022100989c1757cbf822723a670e82e9e1a3af2da33e1b6831b8521a36dc612347d50802207ccab24b18c1817746c683026a1d80553476f2da01fea1dcf3e3e7f678a00ad7", hex.EncodeToString(endorsements[1].Signature))
+	assert.Equal(
+		t,
+		"3045022100989c1757cbf822723a670e82e9e1a3af2da33e1b6831b8521a36dc612347d50802207ccab24b18c1817746c683026a1d80553476f2da01fea1dcf3e3e7f678a00ad7",
+		hex.EncodeToString(endorsements[1].Signature),
+	)
 }
 
 func TestCreatorMSPID(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	creatorMSPID, err := action.CreatorMSPID()
@@ -60,16 +80,26 @@ func TestCreatorMSPID(t *testing.T) {
 }
 
 func TestCreatorCertBytes(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	certBytes, err := action.CreatorCertBytes()
 	assert.NoError(t, err)
+
 	certHash := sha256.New()
 	certHash.Write(certBytes)
-	assert.Equal(t, "41202425b7c240ef2bfc3e9d48c457257b4d1fd5187a9943e3824be5c270f979", hex.EncodeToString(certHash.Sum(nil)))
+
+	assert.Equal(
+		t,
+		"41202425b7c240ef2bfc3e9d48c457257b4d1fd5187a9943e3824be5c270f979",
+		hex.EncodeToString(certHash.Sum(nil)),
+	)
 }
 
 func TestCreatorCertHashHex(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	cert, err := action.CreatorCertHashHex()
@@ -78,6 +108,8 @@ func TestCreatorCertHashHex(t *testing.T) {
 }
 
 func TestChaincodeProposalPayload(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	ccPropRespPayload, err := action.ChaincodeProposalPayload()
@@ -86,6 +118,8 @@ func TestChaincodeProposalPayload(t *testing.T) {
 }
 
 func TestChaincodeInput(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	input, err := action.ChaincodeInput()
@@ -94,6 +128,8 @@ func TestChaincodeInput(t *testing.T) {
 }
 
 func TestDecorations(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	decor, err := action.Decorations()
@@ -102,6 +138,8 @@ func TestDecorations(t *testing.T) {
 }
 
 func TestIsInit(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	isinit, err := action.IsInit()
@@ -110,6 +148,8 @@ func TestIsInit(t *testing.T) {
 }
 
 func TestProposalResponsePayload(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	propRespPayload, err := action.ProposalResponsePayload()
@@ -119,14 +159,22 @@ func TestProposalResponsePayload(t *testing.T) {
 }
 
 func TestProposalHash(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/sampleblock.pb")
 	assert.NoError(t, err)
 	hash, err := action.ProposalHash()
 	assert.NoError(t, err)
-	assert.Equal(t, "d61815db10b7b0f61ae13873c81076481d573aa8265457f85abea0332f5e007b", hex.EncodeToString(hash))
+	assert.Equal(
+		t,
+		"d61815db10b7b0f61ae13873c81076481d573aa8265457f85abea0332f5e007b",
+		hex.EncodeToString(hash),
+	)
 }
 
 func TestChaincodeAction(t *testing.T) {
+	t.Parallel()
+
 	action, err := GetActionFromBlock("./mock/genesis.pb")
 	assert.NoError(t, err)
 	ccAction, err := action.ChaincodeAction()

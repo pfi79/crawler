@@ -7,6 +7,7 @@ package crawler
 
 import (
 	"fmt"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
@@ -19,32 +20,38 @@ import (
 type Option func(crawler *Crawler) error
 
 // WithAutoConnect connects crawler to all channels specified in connection profile
-// 'username' is a Fabric identity name and 'org' is a Fabric organization ti which the identity belongs
+// 'username' is a Fabric identity name and 'org' is
+// a Fabric organization ti which the identity belongs.
 func WithAutoConnect(username, org string, identity msp.SigningIdentity) Option {
 	return func(crawler *Crawler) error {
 		configBackend, err := crawler.sdk.Config()
 		if err != nil {
 			return err
 		}
-		if channelsIface, ok := configBackend.Lookup("channels"); !ok {
+
+		channelsIface, ok := configBackend.Lookup("channels")
+		if !ok {
 			return fmt.Errorf("failed to find channels in connection profile")
-		} else {
-			channelsMap, ok := channelsIface.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("failed to parse connection profile")
+		}
+
+		channelsMap, ok := channelsIface.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("failed to parse connection profile")
+		}
+
+		for ch := range channelsMap {
+			if identity != nil {
+				crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
+			} else {
+				crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithUser(username), fabsdk.WithOrg(org))
 			}
 
-			var err error
-			for ch := range channelsMap {
-				if identity != nil {
-					crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
-				} else {
-					crawler.channelProvider = crawler.sdk.ChannelContext(ch, fabsdk.WithUser(username), fabsdk.WithOrg(org))
-				}
-				crawler.chCli[ch], err = channel.New(crawler.channelProvider)
+			crawler.chCli[ch], err = channel.New(crawler.channelProvider)
+			if err != nil {
 				return err
 			}
 		}
+
 		return nil
 	}
 }
@@ -53,6 +60,7 @@ func WithAutoConnect(username, org string, identity msp.SigningIdentity) Option 
 func WithSDK(sdk *fabsdk.FabricSDK) Option {
 	return func(crawler *Crawler) error {
 		crawler.sdk = sdk
+
 		return nil
 	}
 }
@@ -61,6 +69,7 @@ func WithSDK(sdk *fabsdk.FabricSDK) Option {
 func WithConfigProvider(configProvider core.ConfigProvider) Option {
 	return func(crawler *Crawler) error {
 		crawler.configProvider = configProvider
+
 		return nil
 	}
 }
@@ -70,6 +79,7 @@ func WithConfigProvider(configProvider core.ConfigProvider) Option {
 func WithParser(p parser.Parser) Option {
 	return func(crawler *Crawler) error {
 		crawler.parser = p
+
 		return nil
 	}
 }
@@ -79,6 +89,7 @@ func WithParser(p parser.Parser) Option {
 func WithStorage(s storage.Storage) Option {
 	return func(crawler *Crawler) error {
 		crawler.storage = s
+
 		return nil
 	}
 }
@@ -88,6 +99,7 @@ func WithStorage(s storage.Storage) Option {
 func WithStorageAdapter(a storageadapter.StorageAdapter) Option {
 	return func(crawler *Crawler) error {
 		crawler.adapter = a
+
 		return nil
 	}
 }
@@ -95,14 +107,14 @@ func WithStorageAdapter(a storageadapter.StorageAdapter) Option {
 type ListenOpt func() interface{}
 
 const (
-	LISTEN_FROM   = "from"
-	LISTEN_NEWEST = "newest"
-	LISTEN_OLDEST = "oldest"
+	ListenFrom   = "from"
+	ListenNewest = "newest"
+	ListenOldest = "oldest"
 )
 
 func FromBlock() ListenOpt {
 	return func() interface{} {
-		return LISTEN_FROM
+		return ListenFrom
 	}
 }
 
@@ -114,12 +126,12 @@ func WithBlockNum(block uint64) ListenOpt {
 
 func Newest() ListenOpt {
 	return func() interface{} {
-		return LISTEN_NEWEST
+		return ListenNewest
 	}
 }
 
 func Oldest() ListenOpt {
 	return func() interface{} {
-		return LISTEN_OLDEST
+		return ListenOldest
 	}
 }

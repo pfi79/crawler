@@ -3,15 +3,16 @@ Copyright LLC Newity. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Google cloud Pub/Sub implementation of Storage
+// Package storage - Google cloud Pub/Sub implementation of Storage
 package storage
 
 import (
-	"cloud.google.com/go/pubsub"
 	"context"
-	"google.golang.org/api/option"
 	"sync"
 	"time"
+
+	"cloud.google.com/go/pubsub"
+	"google.golang.org/api/option"
 )
 
 type PubSub struct {
@@ -22,11 +23,11 @@ type PubSub struct {
 }
 
 func NewPubSub(project string, opts ...option.ClientOption) (*PubSub, error) {
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project, opts...)
+	client, err := pubsub.NewClient(context.Background(), project, opts...)
 	if err != nil {
 		return nil, err
 	}
+
 	return &PubSub{
 		client:        client,
 		topics:        make(map[string]*pubsub.Topic),
@@ -36,13 +37,16 @@ func NewPubSub(project string, opts ...option.ClientOption) (*PubSub, error) {
 
 func (p *PubSub) InitChannelsStorage(channels []string) error {
 	p.ctx = context.Background()
+
 	for _, channel := range channels {
 		var topic *pubsub.Topic
 		topic = p.client.Topic(channel)
+
 		topicExists, err := topic.Exists(p.ctx)
 		if err != nil {
 			return err
 		}
+
 		if !topicExists {
 			topic, err = p.client.CreateTopic(p.ctx, channel)
 			if err != nil {
@@ -55,7 +59,8 @@ func (p *PubSub) InitChannelsStorage(channels []string) error {
 
 		var sub *pubsub.Subscription
 		sub = p.client.Subscription(channel)
-		subExists, err := sub.Exists(p.ctx)
+
+		subExists, _ := sub.Exists(p.ctx)
 		if !subExists {
 			sub, err = p.client.CreateSubscription(p.ctx, channel, pubsub.SubscriptionConfig{
 				Topic:                 topic,
@@ -71,6 +76,7 @@ func (p *PubSub) InitChannelsStorage(channels []string) error {
 		sub.ReceiveSettings.Synchronous = true
 		p.subscriptions[channel] = sub
 	}
+
 	return nil
 }
 
@@ -81,21 +87,26 @@ func (p *PubSub) Put(topic string, msg []byte) error {
 		OrderingKey: "0",
 	})
 	<-res.Ready()
+
 	return nil
 }
 
 // Get reads one message from the topic and closes channel.
 func (p *PubSub) Get(topic string) ([]byte, error) {
 	var err error
-	ctx, _ := context.WithCancel(context.Background())
+
+	ctx := context.Background()
 	ch, errch := make(chan []byte), make(chan error)
+
 	go func(ch chan []byte, errch chan error) {
-		err = p.subscriptions[topic].Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
-			ch <- m.Data
-			m.Ack()
-			return
-		})
-		if err != nil && err == context.Canceled {
+		err = p.subscriptions[topic].Receive(
+			ctx,
+			func(ctx context.Context, m *pubsub.Message) {
+				ch <- m.Data
+				m.Ack()
+			},
+		)
+		if err != nil {
 			errch <- err
 		}
 	}(ch, errch)
@@ -111,31 +122,38 @@ func (p *PubSub) Get(topic string) ([]byte, error) {
 // GetStream reads a stream of messages from topic and writes them to the channel.
 func (p *PubSub) GetStream(topic string) (<-chan []byte, <-chan error) {
 	var err error
+
 	ch, errch := make(chan []byte), make(chan error)
+
 	var wg sync.WaitGroup
+
 	wg.Add(1)
+
 	go func() {
-		wg.Done()
 		err = p.subscriptions[topic].Receive(context.Background(), func(ctx context.Context, m *pubsub.Message) {
 			ch <- m.Data
 			m.Ack()
 		})
-		if err != nil && err == context.Canceled {
+
+		wg.Done()
+
+		if err != nil {
 			errch <- err
 		}
 	}()
 	wg.Wait()
+
 	return ch, errch
 }
 
-// Detele deletes topic and subscription specified by key.
+// Delete deletes topic and subscription specified by key.
 func (p *PubSub) Delete(key string) error {
 	err := p.topics[key].Delete(p.ctx)
 	if err != nil {
 		return err
 	}
-	err = p.subscriptions[key].Delete(p.ctx)
-	return err
+
+	return p.subscriptions[key].Delete(p.ctx)
 }
 
 // Close stops all running goroutines related to topics.
@@ -143,5 +161,6 @@ func (p *PubSub) Close() error {
 	for _, topic := range p.topics {
 		topic.Stop()
 	}
+
 	return nil
 }

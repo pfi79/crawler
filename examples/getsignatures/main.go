@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/newity/crawler"
@@ -42,7 +43,9 @@ func main() {
 
 		logrus.WithField("Block", block.Number()).Info("Orderer")
 		for _, ordererSignature := range block.OrderersSignatures() {
-			logrus.Infof("Nonce: %v\nMSP ID: %s\nHex representation of the signature hash: %s\nCertificate: %s\n",
+			logrus.Infof(
+				"Nonce: %v\nMSP ID: %s\nHex representation of "+
+					"the signature hash: %s\nCertificate: %s\n",
 				ordererSignature.Nonce,
 				ordererSignature.MSPID,
 				GetHashedHex(ordererSignature.Signature),
@@ -70,17 +73,24 @@ func main() {
 			if err != nil {
 				logrus.Fatal(err)
 			}
+
 			for i, action := range actions {
 				logrus.Info("action ", i)
+
 				endorsements := action.Endorsements()
+
 				for _, endorsement := range endorsements {
 					endorser := &msp.SerializedIdentity{}
+
 					err = proto.Unmarshal(endorsement.Endorser, endorser)
 					if err != nil {
 						logrus.Fatal(err)
 					}
 
-					fmt.Printf("Creator MSP ID: %s\nCreator signature: %s\nCreator cert: %s\nEndorser MSP ID: %s\nEndorser cert: %s\nEndorser signature: %s\n",
+					fmt.Printf(
+						"Creator MSP ID: %s\nCreator signature: "+
+							"%s\nCreator cert: %s\nEndorser MSP ID: "+
+							"%s\nEndorser cert: %s\nEndorser signature: %s\n",
 						mspidCreator,
 						sigCreator,
 						certCreator,

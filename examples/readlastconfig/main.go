@@ -18,7 +18,10 @@ const (
 )
 
 func main() {
-	engine, err := crawler.New("connection.yaml", crawler.WithAutoConnect(USER, ORG))
+	engine, err := crawler.New(
+		"connection.yaml",
+		crawler.WithAutoConnect(USER, ORG),
+	)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -35,11 +38,18 @@ func main() {
 		if err != nil {
 			logrus.Error(err)
 		}
+
 		index, err := block.LastConfig()
 		if err != nil {
 			logrus.Error(err)
 		}
-		logrus.Infof("[%s] Last config index for block %d is %d\n", CHANNEL, block.Number(), index)
+
+		logrus.Infof(
+			"[%s] Last config index for block %d is %d\n",
+			CHANNEL,
+			block.Number(),
+			index,
+		)
 	}
 
 	engine.StopListenAll()

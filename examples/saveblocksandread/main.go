@@ -8,14 +8,15 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/newity/crawler"
-	"github.com/newity/crawler/storage"
-	"github.com/newity/crawler/storageadapter"
-	"github.com/sirupsen/logrus"
 	"os"
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/newity/crawler"
+	"github.com/newity/crawler/storage"
+	"github.com/newity/crawler/storageadapter"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,7 +31,12 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	engine, err := crawler.New("connection.yaml", crawler.WithAutoConnect(USER, ORG), crawler.WithStorage(stor), crawler.WithStorageAdapter(storageadapter.NewSimpleAdapter(stor)))
+	engine, err := crawler.New(
+		"connection.yaml",
+		crawler.WithAutoConnect(USER, ORG),
+		crawler.WithStorage(stor),
+		crawler.WithStorageAdapter(storageadapter.NewSimpleAdapter(stor)),
+	)
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -55,18 +61,30 @@ func readBlock(engine *crawler.Crawler, num int) {
 		logrus.Error(err)
 	}
 
-	logrus.Infof("block %d with hash %s and previous hash %s\n\nOrderers signed:\n", data.BlockNumber,
+	logrus.Infof(
+		"block %d with hash %s and previous hash %s\n\nOrderers signed:\n",
+		data.BlockNumber,
 		hex.EncodeToString(data.Datahash),
-		hex.EncodeToString(data.Prevhash))
+		hex.EncodeToString(data.Prevhash),
+	)
+
 	for _, signature := range data.BlockSignatures {
-		fmt.Printf("MSP ID: %s\nSignature: %s\nCertificate:\n%s\n", signature.MSPID, hex.EncodeToString(signature.Signature), string(signature.Cert))
+		fmt.Printf(
+			"MSP ID: %s\nSignature: %s\nCertificate:\n%s\n",
+			signature.MSPID,
+			hex.EncodeToString(signature.Signature),
+			string(signature.Cert),
+		)
 	}
+
 	fmt.Println("Transactions")
+
 	for _, tx := range data.Txs {
 		t, err := tx.Timestamp()
 		if err != nil {
 			logrus.Error(err)
 		}
+
 		txid, err := tx.TxId()
 		if err != nil {
 			logrus.Error(err)

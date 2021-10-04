@@ -8,6 +8,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/stan.go"
 	"github.com/newity/crawler"
@@ -37,13 +38,24 @@ var ConnStatuses = map[nats.Status]string{
 func ConnectionLostHandler() func(stan.Conn, error) {
 	return func(conn stan.Conn, err error) {
 		if conn.NatsConn() != nil {
-			logrus.Fatalf("connection to the NATS server is broken (status %s), error: %s", ConnStatuses[conn.NatsConn().Status()], err.Error())
+			logrus.Fatalf(
+				"connection to the NATS server is broken (status %s), error: %s",
+				ConnStatuses[conn.NatsConn().Status()],
+				err.Error(),
+			)
 		}
 	}
 }
 
 func main() {
-	natsStorage, err := storage.NewNats(CLUSTER_ID, USER, stan.NatsURL(NATS_URL), stan.MaxPubAcksInflight(10000000), stan.Pings(1, 100), stan.SetConnectionLostHandler(ConnectionLostHandler()))
+	natsStorage, err := storage.NewNats(
+		CLUSTER_ID,
+		USER,
+		stan.NatsURL(NATS_URL),
+		stan.MaxPubAcksInflight(10000000),
+		stan.Pings(1, 100),
+		stan.SetConnectionLostHandler(ConnectionLostHandler()),
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -53,7 +65,11 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	engine, err := crawler.New("connection.yaml", crawler.WithStorage(natsStorage), crawler.WithStorageAdapter(storageadapter.NewQueueAdapter(natsStorage)))
+	engine, err := crawler.New(
+		"connection.yaml",
+		crawler.WithStorage(natsStorage),
+		crawler.WithStorageAdapter(storageadapter.NewQueueAdapter(natsStorage)),
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -76,26 +92,42 @@ func main() {
 
 func readFromQueue(engine *crawler.Crawler, topic string) {
 	dataChan, errChan := engine.ReadStreamFromStorage(topic)
+
 	for {
 		select {
 		case data := <-dataChan:
-			logrus.Infof("block %d with hash %s and previous hash %s\n\nOrderers signed:\n", data.BlockNumber,
+			logrus.Infof(
+				"block %d with hash %s and previous hash %s\n\nOrderers signed:\n",
+				data.BlockNumber,
 				hex.EncodeToString(data.Datahash),
-				hex.EncodeToString(data.Prevhash))
+				hex.EncodeToString(data.Prevhash),
+			)
+
 			for _, signature := range data.BlockSignatures {
-				fmt.Printf("MSP ID: %s\nSignature: %s\nCertificate:\n%s\n", signature.MSPID, hex.EncodeToString(signature.Signature), string(signature.Cert))
+				fmt.Printf(
+					"MSP ID: %s\nSignature: %s\nCertificate:\n%s\n",
+					signature.MSPID,
+					hex.EncodeToString(signature.Signature),
+					string(signature.Cert),
+				)
 			}
+
 			for _, tx := range data.Txs {
 				t, err := tx.Timestamp()
 				if err != nil {
 					logrus.Error("failed to get timestamp", err)
 				}
+
 				txid, err := tx.TxId()
 				if err != nil {
 					logrus.Error("failed to get tx ID", err)
 				}
 
-				fmt.Printf("Tx ID: %s\nCreation time: %s\n", txid, t.String())
+				fmt.Printf(
+					"Tx ID: %s\nCreation time: %s\n",
+					txid,
+					t.String(),
+				)
 			}
 		case err := <-errChan:
 			logrus.Error(err)

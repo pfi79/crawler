@@ -8,12 +8,13 @@ package blocklib
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
-	"time"
 )
 
 type TxValidationFlags []uint8
@@ -24,17 +25,22 @@ type Tx struct {
 	validationStatus string
 }
 
-// IsValid checks if transaction with specified number (txNumber int) in block (block *common.Block) is valid or not and returns corresponding bool value.
+// IsValid checks if transaction with specified number (txNumber int)
+// in block (block *common.Block) is valid
+// or not and returns corresponding bool value.
 func (tx *Tx) IsValid() bool {
 	return tx.validationCode == 0
 }
 
-// ValidationCode returns validation code for transaction with specified number (txNumber int) in block (block *common.Block).
+// ValidationCode returns validation code for transaction
+// with specified number (txNumber int) in block (block *common.Block).
 func (tx *Tx) ValidationCode() int32 {
 	return tx.validationCode
 }
 
-// ValidationStatus returns string representation of validation code for transaction with specified number (txNumber int) in block (block *common.Block).
+// ValidationStatus returns string representation of validation code
+// for transaction with specified number (txNumber int)
+// in block (block *common.Block).
 func (tx *Tx) ValidationStatus() string {
 	return tx.validationStatus
 }
@@ -46,6 +52,7 @@ func (tx *Tx) Envelope() (*common.Envelope, error) {
 	if err := proto.Unmarshal(tx.Data, envelope); err != nil {
 		return nil, err
 	}
+
 	return envelope, nil
 }
 
@@ -55,18 +62,19 @@ func (tx *Tx) ConfigUpdate() (*common.ConfigUpdate, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	payload := &common.Payload{}
-	if err := proto.Unmarshal(env.LastUpdate.Payload, payload); err != nil {
+	if err = proto.Unmarshal(env.LastUpdate.Payload, payload); err != nil {
 		return nil, err
 	}
 
 	updateEnv := &common.ConfigUpdateEnvelope{}
-	if err := proto.Unmarshal(payload.Data, updateEnv); err != nil {
+	if err = proto.Unmarshal(payload.Data, updateEnv); err != nil {
 		return nil, err
 	}
 
 	update := &common.ConfigUpdate{}
-	if err := proto.Unmarshal(updateEnv.ConfigUpdate, update); err != nil {
+	if err = proto.Unmarshal(updateEnv.ConfigUpdate, update); err != nil {
 		return nil, err
 	}
 
@@ -80,13 +88,14 @@ func (tx *Tx) ConfigEnvelope() (*common.ConfigEnvelope, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	payload := &common.Payload{}
-	if err := proto.Unmarshal(envelope.Payload, payload); err != nil {
+	if err = proto.Unmarshal(envelope.Payload, payload); err != nil {
 		return nil, err
 	}
 
 	configEnvelope := &common.ConfigEnvelope{}
-	if err := proto.Unmarshal(payload.Data, configEnvelope); err != nil {
+	if err = proto.Unmarshal(payload.Data, configEnvelope); err != nil {
 		return nil, err
 	}
 
@@ -99,6 +108,7 @@ func (tx *Tx) ConfigSequence() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return configEnvelope.Config.Sequence, nil
 }
 
@@ -109,6 +119,7 @@ func (tx *Tx) ConfigGroup() (*common.ConfigGroup, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return configEnvelope.Config.ChannelGroup, nil
 }
 
@@ -118,29 +129,36 @@ func (tx *Tx) ConfigEnvelopeLastUpdatePayload() (*common.Payload, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	payload := &common.Payload{}
+
 	err = proto.Unmarshal(configEnvelope.LastUpdate.Payload, payload)
 	if err != nil {
 		return nil, err
 	}
+
 	return payload, nil
 }
 
-// CfgEnvLastUpdateCreatorSignatureBytes extracts signature of transaction creator as bytes slice.
+// CfgEnvLastUpdateCreatorSignatureBytes extracts signature
+// of transaction creator as bytes slice.
 func (tx *Tx) CfgEnvLastUpdateCreatorSignatureBytes() ([]byte, error) {
 	configEnvelope, err := tx.ConfigEnvelope()
 	if err != nil {
 		return nil, err
 	}
+
 	return configEnvelope.LastUpdate.Signature, nil
 }
 
-// CfgEnvLastUpdateCreatorSignatureHex extracts signature of transaction creator as hex-encoded string.
+// CfgEnvLastUpdateCreatorSignatureHex extracts signature
+// of transaction creator as hex-encoded string.
 func (tx *Tx) CfgEnvLastUpdateCreatorSignatureHex() (string, error) {
 	configEnvelope, err := tx.ConfigEnvelope()
 	if err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(configEnvelope.LastUpdate.Signature), nil
 }
 
@@ -151,11 +169,14 @@ func (tx *Tx) Payload() (*common.Payload, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	payload := &common.Payload{}
+
 	err = proto.Unmarshal(envelope.Payload, payload)
 	if err != nil {
 		return nil, err
 	}
+
 	return payload, nil
 }
 
@@ -165,25 +186,32 @@ func (tx *Tx) ChannelHeader() (*common.ChannelHeader, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	chdr := &common.ChannelHeader{}
+
 	err = proto.Unmarshal(payload.Header.ChannelHeader, chdr)
 	if err != nil {
 		return nil, err
 	}
+
 	return chdr, nil
 }
 
-// SignatureHeader returns pointer to common.SignatureHeader that contains nonce and creator (msp.SerializedIdentity).
+// SignatureHeader returns pointer to common.SignatureHeader
+// that contains nonce and creator (msp.SerializedIdentity).
 func (tx *Tx) SignatureHeader() (*common.SignatureHeader, error) {
 	payload, err := tx.Payload()
 	if err != nil {
 		return nil, err
 	}
+
 	sighdr := &common.SignatureHeader{}
+
 	err = proto.Unmarshal(payload.Header.SignatureHeader, sighdr)
 	if err != nil {
 		return nil, err
 	}
+
 	return sighdr, nil
 }
 
@@ -193,8 +221,10 @@ func (tx *Tx) Creator() (string, []byte, error) {
 	if err != nil {
 		return "", nil, err
 	}
+
 	identity := &msp.SerializedIdentity{}
 	err = proto.Unmarshal(sighdr.Creator, identity)
+
 	return identity.Mspid, identity.IdBytes, err
 }
 
@@ -204,43 +234,57 @@ func (tx *Tx) CreatorSignatureBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return envelope.Signature, err
 }
 
-// CreatorSignatureHexString extracts signature of transaction creator as hex-encoded string.
+// CreatorSignatureHexString extracts signature
+// of transaction creator as hex-encoded string.
 func (tx *Tx) CreatorSignatureHexString() (string, error) {
 	envelope, err := tx.Envelope()
 	if err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(envelope.Signature), err
 }
 
-// ChaincodeId returns peer.ChaincodeID (name, version and path) of the target chaincode (only if it's type is common.HeaderType_ENDORSER_TRANSACTION).
-func (tx *Tx) ChaincodeId() (*peer.ChaincodeID, error) {
+// ChaincodeID returns peer.ChaincodeID (name, version and path)
+// of the target chaincode
+// (only if it's type is common.HeaderType_ENDORSER_TRANSACTION).
+func (tx *Tx) ChaincodeID() (*peer.ChaincodeID, error) {
 	chhdr, err := tx.ChannelHeader()
 	if err != nil {
 		return nil, err
 	}
+
 	if chhdr.Type == int32(common.HeaderType_ENDORSER_TRANSACTION) {
 		ccHeaderExt := &peer.ChaincodeHeaderExtension{}
 		err = proto.Unmarshal(chhdr.Extension, ccHeaderExt)
+
 		return ccHeaderExt.ChaincodeId, err
-	} else {
-		return nil, fmt.Errorf("Not an endorser transaction type (type code %d)", chhdr.Type)
 	}
+
+	return nil, fmt.Errorf(
+		"not an endorser transaction type (type code %d)",
+		chhdr.Type,
+	)
 }
 
-// Epoch returns the epoch in which this header was generated, where epoch is defined based on block height
+// Epoch returns the epoch in which this header was generated,
+// where epoch is defined based on block height
 // Epoch in which the response has been generated. This field identifies a
 // logical window of time. A proposal response is accepted by a peer only if
 // two conditions hold:
 // 1. the epoch specified in the message is the current epoch
-// 2. this message has been only seen once during this epoch (i.e. it hasn't been replayed)
+// 2. this message has been only seen once during this epoch
+// (i.e. it hasn't been replayed)
 //
-// Always equals to 0 because of this reason: https://github.com/hyperledger/fabric/blob/release-2.1/core/common/validation/msgvalidation.go#L110
+// Always equals to 0 because of this reason:
+// https://github.com/hyperledger/fabric/blob/release-2.1/core/common/validation/msgvalidation.go#L110
 func (tx *Tx) Epoch() (uint64, error) {
 	chhdr, err := tx.ChannelHeader()
+
 	return chhdr.Epoch, err
 }
 
@@ -250,59 +294,76 @@ func (tx *Tx) Timestamp() (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	t, err := ptypes.Timestamp(chhdr.Timestamp)
-	return t, err
+
+	return ptypes.Timestamp(chhdr.Timestamp)
 }
 
-// TlsCertHash returns hash of the client's TLS certificate (if mutual TLS is employed).
-func (tx *Tx) TlsCertHash() ([]byte, error) {
+// TLSCertHash returns hash of the client's TLS certificate
+// (if mutual TLS is employed).
+func (tx *Tx) TLSCertHash() ([]byte, error) {
 	chhdr, err := tx.ChannelHeader()
+
 	return chhdr.TlsCertHash, err
 }
 
-// TxId returns transaction ID.
-func (tx *Tx) TxId() (string, error) {
+// TxID returns transaction ID.
+func (tx *Tx) TxID() (string, error) {
 	chhdr, err := tx.ChannelHeader()
+
 	return chhdr.TxId, err
 }
 
 // PeerTransaction returns pointer to peer.Transaction.
-// The transaction to be sent to the ordering service. A transaction contains one or more TransactionAction.
+// The transaction to be sent to the ordering service.
+// A transaction contains one or more TransactionAction.
 // Each TransactionAction binds a proposal to potentially multiple actions.
-// The transaction is atomic meaning that either all actions in the transaction will be committed or none will.
-// Note that while a Transaction might include more than one Header, the Header.creator field must be the same in each.
-// A single client is free to issue a number of independent Proposal, each with their header (Header) and request payload (ChaincodeProposalPayload).
-// Each proposal is independently endorsed generating an action (ProposalResponsePayload) with one signature per Endorser.
-// Any number of independent proposals (and their action) might be included in a transaction to ensure that they are treated atomically.
+// The transaction is atomic meaning that either all actions in
+// the transaction will be committed or none will.
+// Note that while a Transaction might include more than one Header,
+// the Header.creator field must be the same in each.
+// A single client is free to issue a number of independent Proposal,
+// each with their header (Header) and request payload (ChaincodeProposalPayload).
+// Each proposal is independently endorsed generating an action
+// (ProposalResponsePayload) with one signature per Endorser.
+// Any number of independent proposals (and their action) might be included in
+// a transaction to ensure that they are treated atomically.
 func (tx *Tx) PeerTransaction() (*peer.Transaction, error) {
 	payload, err := tx.Payload()
 	if err != nil {
 		return nil, err
 	}
+
 	transaction := &peer.Transaction{}
-	if err := proto.Unmarshal(payload.Data, transaction); err != nil {
+
+	if err = proto.Unmarshal(payload.Data, transaction); err != nil {
 		return nil, err
 	}
+
 	return transaction, nil
 }
 
-// GetTransaction returns slice of the Action structs
+// Actions - GetTransaction returns slice of the Action structs.
 func (tx *Tx) Actions() ([]Action, error) {
 	transaction, err := tx.PeerTransaction()
 	if err != nil {
 		return nil, err
 	}
-	var actions []Action
+
+	actions := make([]Action, 0, len(transaction.Actions))
+
 	for _, act := range transaction.Actions {
 		ccActionPayload := &peer.ChaincodeActionPayload{}
-		if err := proto.Unmarshal(act.Payload, ccActionPayload); err != nil {
+		if err = proto.Unmarshal(act.Payload, ccActionPayload); err != nil {
 			return nil, err
 		}
+
 		ccActionSignatureHeader := &common.SignatureHeader{}
-		if err := proto.Unmarshal(act.Header, ccActionSignatureHeader); err != nil {
+		if err = proto.Unmarshal(act.Header, ccActionSignatureHeader); err != nil {
 			return nil, err
 		}
+
 		actions = append(actions, Action{Payload: ccActionPayload, SignatureHeader: ccActionSignatureHeader})
 	}
+
 	return actions, nil
 }

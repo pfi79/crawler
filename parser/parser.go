@@ -12,8 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type ParserImpl struct {
-}
+type ParserImpl struct{}
 
 func New() *ParserImpl {
 	return &ParserImpl{}
@@ -24,6 +23,7 @@ func (p *ParserImpl) Parse(block *common.Block) (*Data, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	txs, err := b.Txs()
 	if err != nil {
 		return nil, err
@@ -37,41 +37,22 @@ func (p *ParserImpl) Parse(block *common.Block) (*Data, error) {
 	if !b.IsConfig() {
 		for _, tx := range txs {
 			selectedTransactions = append(selectedTransactions, tx)
+
 			actions, err := tx.Actions()
 			if err != nil {
 				logrus.Errorf("failed to actions from transaction: %s", err)
+
 				continue
 			}
-			for _, action := range actions {
-				//ccActionPayload := action.ChaincodeActionPayload()
-				//if ccActionPayload.Action == nil || ccActionPayload.Action.ProposalResponsePayload == nil {
-				//	logrus.Debug("no payload in ChaincodeActionPayload")
-				//	continue
-				//}
-				//
-				//ccAction, err := action.ChaincodeAction()
-				//if err != nil {
-				//	logrus.Errorf("failed to get to ChaincodeAction: %s", err)
-				//	continue
-				//}
-				//_ = ccAction
-				//rwsets, err := action.RWSets()
-				//if err != nil {
-				//	logrus.Errorf("failed to extract rwsets: %+v", err)
-				//	continue
-				//}
-				//
-				//for _, rw := range rwsets {
-				//	for _, write := range rw.KVRWSet.Writes {
-				//		_ = write
-				//	}
-				//}
 
+			for _, action := range actions {
 				ccEvent, err := action.ChaincodeEvent()
 				if err != nil {
 					logrus.Errorf("failed to extract chaincode events: %s", err)
+
 					continue
 				}
+
 				selectedEvents = append(selectedEvents, ccEvent)
 			}
 		}
