@@ -7,10 +7,11 @@ package storage
 
 import (
 	"context"
-	badger "github.com/dgraph-io/badger/v2"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/dgraph-io/badger/v2"
 )
 
 type Badger struct {
@@ -19,9 +20,12 @@ type Badger struct {
 
 func NewBadger(path string) (*Badger, error) {
 	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
+	if err == nil {
 		if strings.Contains(err.Error(), "Another process is using this Badger database") {
 			db, err = badger.Open(badger.DefaultOptions(path + strconv.Itoa(os.Getpid())))
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			return nil, err
 		}
@@ -30,20 +34,21 @@ func NewBadger(path string) (*Badger, error) {
 	return &Badger{db}, nil
 }
 
-func (b *Badger) InitChannelsStorage(channels []string) error {
+func (b *Badger) InitChannelsStorage(_ []string) error { // channels
 	return nil
 }
 
-// Put saves value by key
+// Put saves value by key.
 func (b *Badger) Put(key string, value []byte) error {
 	return b.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(key), value)
 	})
 }
 
-// Get retrieves data from BadgerDB using key
+// Get retrieves data from BadgerDB using key.
 func (b *Badger) Get(_ context.Context, key string) ([]byte, error) {
 	var value []byte
+
 	err := b.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
 		if err != nil {
@@ -51,8 +56,10 @@ func (b *Badger) Get(_ context.Context, key string) ([]byte, error) {
 		}
 		err = item.Value(func(val []byte) error {
 			value = append([]byte{}, val...)
+
 			return nil
 		})
+
 		return err
 	})
 
@@ -69,6 +76,9 @@ func (b *Badger) Close() error {
 	return b.db.Close()
 }
 
-func (b *Badger) GetStream(_ context.Context, key string) (<-chan []byte, <-chan error) {
+func (b *Badger) GetStream(
+	_ context.Context,
+	_ string, // key
+) (<-chan []byte, <-chan error) {
 	return nil, nil
 }

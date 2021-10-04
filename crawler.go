@@ -3,33 +3,14 @@ Copyright LLC Newity. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Crawler is a minimalistic blockchain (Hyperledger Fabric) parsing framework.
-//
-// This is what the initialization of the crawler might look like:
-//
-//		engine := crawler.New("connection.yaml")
-//		err := engine.Connect("fiat", "User1", "atomyze")
-//		if err != nil {
-//			panic(err)
-//		}
-//		err = engine.Listen(crawler.FromBlock(), crawler.WithBlockNum(0))
-//		if err != nil {
-//			panic(err)
-//		}
-//
-// For connection to all channels from connection profile:
-//
-//		engine := crawler.New("connection.yaml", crawler.WithAutoConnect("User1", "Org1"))
-//		err := engine.Listen(crawler.FromBlock(), crawler.WithBlockNum(0))
-//		if err != nil {
-//			panic(err)
-//		}
-//
-
 package crawler
 
 import (
 	"context"
+	"os"
+	"path"
+	"time"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	contextApi "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
@@ -43,12 +24,9 @@ import (
 	"github.com/newity/crawler/storage"
 	"github.com/newity/crawler/storageadapter"
 	"github.com/sirupsen/logrus"
-	"os"
-	"path"
-	"time"
 )
 
-// Crawler is responsible for fetching info from blockchain
+// Crawler is responsible for fetching info from blockchain.
 type Crawler struct {
 	sdk             *fabsdk.FabricSDK
 	chCli           map[string]*channel.Client
@@ -63,7 +41,7 @@ type Crawler struct {
 }
 
 // New creates Crawler instance from HLF connection profile and returns pointer to it.
-// "connectionProfile" is a path to HLF connection profile
+// "connectionProfile" is a path to HLF connection profile.
 func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 	crawl := &Crawler{
 		chCli:         make(map[string]*channel.Client),
@@ -83,6 +61,7 @@ func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 		if crawl.configProvider == nil {
 			crawl.configProvider = config.FromFile(connectionProfile)
 		}
+
 		crawl.sdk, err = fabsdk.New(crawl.configProvider)
 		if err != nil {
 			return nil, err
@@ -97,16 +76,15 @@ func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 	// if no storage is specified, use the default storage Badger
 	if crawl.storage == nil {
 		home := os.Getenv("HOME")
-		stor, err := storage.NewBadger(path.Join(home, ".crawler-storage"))
+
+		crawl.storage, err = storage.NewBadger(path.Join(home, ".crawler-storage"))
 		if err != nil {
 			return nil, err
 		}
-		crawl.storage = stor
 	}
 
 	// if no storage adapter is specified, use the default SimpleAdapter
 	if crawl.adapter == nil {
-
 		crawl.adapter = storageadapter.NewSimpleAdapter(crawl.storage)
 	}
 
@@ -123,19 +101,36 @@ func (c *Crawler) ConfigProvider() core.ConfigProvider {
 	return c.configProvider
 }
 
-// Connect connects crawler to channel 'ch' as identity specified in 'username' from organization with name 'org'
+// Connect connects crawler to channel 'ch' as identity specified
+// in 'username' from organization with name 'org'.
 func (c *Crawler) Connect(ch, username, org string) error {
 	var err error
-	c.channelProvider = c.sdk.ChannelContext(ch, fabsdk.WithUser(username), fabsdk.WithOrg(org))
+
+	c.channelProvider = c.sdk.ChannelContext(
+		ch,
+		fabsdk.WithUser(username),
+		fabsdk.WithOrg(org),
+	)
 	c.chCli[ch], err = channel.New(c.channelProvider)
+
 	return err
 }
 
-// ConnectWithIdentity connects crawler to channel 'ch' as passed signing identity from specified organization
-func (c *Crawler) ConnectWithIdentity(ch, org string, identity msp.SigningIdentity) error {
+// ConnectWithIdentity connects crawler to channel 'ch' as
+// passed signing identity from specified organization.
+func (c *Crawler) ConnectWithIdentity(
+	ch, org string,
+	identity msp.SigningIdentity,
+) error {
 	var err error
-	c.channelProvider = c.sdk.ChannelContext(ch, fabsdk.WithIdentity(identity), fabsdk.WithOrg(org))
+
+	c.channelProvider = c.sdk.ChannelContext(
+		ch,
+		fabsdk.WithIdentity(identity),
+		fabsdk.WithOrg(org),
+	)
 	c.chCli[ch], err = channel.New(c.channelProvider)
+
 	return err
 }
 
@@ -150,29 +145,29 @@ func (c *Crawler) Listen(opts ...ListenOpt) error {
 	)
 
 	for _, opt := range opts {
-		switch opt().(type) {
+		switch v := opt().(type) {
 		case string:
-			listenType = opt().(string)
+			listenType = v
 		case event.ClientOption:
-			clientOpts = append([]event.ClientOption{}, opt().(event.ClientOption))
-		default:
-			fromBlock = uint64(opt().(int))
+			clientOpts = append([]event.ClientOption{}, v)
+		case int:
+			fromBlock = uint64(v)
 		}
 	}
 
 	switch listenType {
-	case LISTEN_FROM:
+	case ListenFrom:
 		clientOpts = append(clientOpts,
 			event.WithBlockEvents(),
 			event.WithSeekType(seek.FromBlock),
 			event.WithBlockNum(fromBlock),
 		)
-	case LISTEN_NEWEST:
+	case ListenNewest:
 		clientOpts = append(clientOpts,
 			event.WithBlockEvents(),
 			event.WithSeekType(seek.Newest),
 		)
-	case LISTEN_OLDEST:
+	case ListenOldest:
 		clientOpts = append(clientOpts,
 			event.WithBlockEvents(),
 			event.WithSeekType(seek.Oldest),
@@ -187,9 +182,12 @@ func (c *Crawler) Listen(opts ...ListenOpt) error {
 		if err != nil {
 			return err
 		}
+
 		c.registrations[ch], c.notifiers[ch], err = c.eventCli[ch].RegisterBlockEvent()
+
 		return err
 	}
+
 	return err
 }
 
@@ -197,11 +195,12 @@ func (c *Crawler) ListenerForChannel(channel string) <-chan *fab.BlockEvent {
 	return c.notifiers[channel]
 }
 
-// StopListenChannel removes the registration for block events from channel and closes the channel
+// StopListenChannel removes the registration for
+// block events from channel and closes the channel.
 func (c *Crawler) StopListenChannel(channel string) {
 	for ch, eventcli := range c.eventCli {
 		if channel == ch {
-			go func() { // dirty hack to force dispatcher handle disconenct event
+			go func() { // dirty hack to force dispatcher handle disconnect event
 				for range c.notifiers[ch] {
 				}
 			}()
@@ -210,10 +209,11 @@ func (c *Crawler) StopListenChannel(channel string) {
 	}
 }
 
-// StopListenAll removes the registration for block events from all channels and closes these channels
+// StopListenAll removes the registration for
+// block events from all channels and closes these channels.
 func (c *Crawler) StopListenAll() {
 	for ch, eventcli := range c.eventCli {
-		go func() { // dirty hack to force dispatcher handle disconenct event
+		go func() { // dirty hack to force dispatcher handle disconnect event
 			for range c.notifiers[ch] {
 			}
 		}()
@@ -231,11 +231,14 @@ func (c *Crawler) Run() {
 				data, err := c.parser.Parse(blockevent.Block)
 				if err != nil {
 					logrus.Error(err)
+
 					continue
 				}
+
 				if data == nil {
 					continue
 				}
+
 				if err = c.adapter.Inject(data); err != nil {
 					logrus.Error(err)
 				}
@@ -261,11 +264,14 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 				if nblocks == 0 {
 					firstBlockInBatchTime = time.NewTimer(timer)
 				}
+
 				data, err := c.parser.Parse(blockevent.Block)
 				if err != nil {
 					logrus.Error(err)
+
 					continue
 				}
+
 				if data == nil {
 					continue
 				}
@@ -273,12 +279,15 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 				select {
 				case <-firstBlockInBatchTime.C:
 					nblocks = 0
+
 					firstBlockInBatchTime.Stop()
 
 					if err = c.adapter.Inject(&batch); err != nil {
 						logrus.Error(err)
+
 						batch = parser.Data{}
 					}
+
 					batch = parser.Data{}
 				default:
 					if nblocks <= limit {
@@ -298,15 +307,14 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 							logrus.Error(err)
 						}
 					}
-
 				}
-
 			}
 		}(notifier)
 	}
 }
 
-// GetBlock retrieves specified data from a storage by specified key and returns it in the form of parser.Data.
+// GetFromStorage retrieves specified data from a storage by specified key
+// and returns it in the form of parser.Data.
 func (c *Crawler) GetFromStorage(key string) (*parser.Data, error) {
 	return c.adapter.Retrieve(key)
 }

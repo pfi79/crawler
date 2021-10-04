@@ -8,10 +8,11 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/newity/crawler/blocklib"
-	"io/ioutil"
 )
 
 func main() {
@@ -36,7 +37,10 @@ func getBlock(pathToBlock string) (*common.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fabBlock := &common.Block{}
+
 	err = proto.Unmarshal(file, fabBlock)
+
 	return fabBlock, err
 }

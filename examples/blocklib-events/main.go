@@ -7,12 +7,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/newity/crawler/blocklib"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
-	"strings"
 )
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 		if err != nil {
 			log.Error(err)
 		}
+
 		for _, act := range actions {
 			event, err := act.ChaincodeEvent()
 			if err != nil {
@@ -56,7 +58,10 @@ func getBlock(pathToBlock string) (*common.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fabBlock := &common.Block{}
+
 	err = proto.Unmarshal(file, fabBlock)
+
 	return fabBlock, err
 }

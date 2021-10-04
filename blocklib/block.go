@@ -10,6 +10,8 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"fmt"
+	"math/big"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/msp"
@@ -20,11 +22,9 @@ import (
 	"github.com/newity/crawler/blocklib/smartbft"
 	bftcommon "github.com/newity/crawler/blocklib/smartbft/common"
 	"github.com/pkg/errors"
-	"math/big"
-	"unsafe"
 )
 
-// Block contains all the necessary information about the blockchain block
+// Block contains all the necessary information about the blockchain block.
 type Block struct {
 	Data       [][]byte
 	number     uint64
@@ -37,7 +37,8 @@ type Block struct {
 	isconfig   bool
 }
 
-// BlockSignature contains nonce, cert, MSP ID and signature of the orderer which signed the block
+// BlockSignature contains nonce, cert, MSP ID and
+// signature of the orderer which signed the block.
 type BlockSignature struct {
 	Cert      []byte // pem-encoded
 	MSPID     string
@@ -46,7 +47,7 @@ type BlockSignature struct {
 }
 
 type BFTSerializedIdentity struct {
-	ConsenterId uint64
+	ConsenterID uint64
 	Identity    msp.SerializedIdentity
 }
 
@@ -54,15 +55,24 @@ type BFTSerializedIdentity struct {
 // Such conversion is necessary for further comfortable work with information from the block.
 func FromFabricBlock(block *common.Block) (*Block, error) {
 	metadata := &common.Metadata{}
-	err := proto.Unmarshal(block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES], metadata)
+
+	err := proto.Unmarshal(
+		block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES],
+		metadata,
+	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling metadata from block at index [%s]", common.BlockMetadataIndex_SIGNATURES)
+		return nil, errors.Wrapf(
+			err,
+			"error unmarshaling metadata from block at index [%s]",
+			common.BlockMetadataIndex_SIGNATURES,
+		)
 	}
 
-	var blockSignatures []BlockSignature
+	blockSignatures := make([]BlockSignature, 0, len(metadata.Signatures))
+
 	for _, metadataSignature := range metadata.Signatures {
 		sigHdr := &common.SignatureHeader{}
-		if err := proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
+		if err = proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
 			return nil, errors.Wrap(err, "error unmarshaling SignatureHeader")
 		}
 
@@ -70,6 +80,7 @@ func FromFabricBlock(block *common.Block) (*Block, error) {
 		if err = proto.Unmarshal(sigHdr.Creator, creator); err != nil {
 			return nil, err
 		}
+
 		blockSignatures = append(blockSignatures,
 			BlockSignature{
 				Cert:      creator.IdBytes,
@@ -81,17 +92,19 @@ func FromFabricBlock(block *common.Block) (*Block, error) {
 	}
 
 	envelope := &common.Envelope{}
-	if err := proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
+	if err = proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
 		return nil, err
 	}
 
 	payload := &common.Payload{}
+
 	err = proto.Unmarshal(envelope.Payload, payload)
 	if err != nil {
 		return nil, err
 	}
 
 	hdr := &common.ChannelHeader{}
+
 	err = proto.Unmarshal(payload.Header.ChannelHeader, hdr)
 	if err != nil {
 		return nil, err
@@ -113,12 +126,15 @@ func FromFabricBlock(block *common.Block) (*Block, error) {
 		datahash:   block.Header.DataHash,
 		headerhash: headerHash[:],
 		txsFilter:  filter,
-		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
+		isconfig: common.HeaderType(hdr.Type) == common.HeaderType_CONFIG ||
+			common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
 	}, nil
 }
 
 // CheckIntegrity checks that two blocks are 'connected'.
-// This func compares current block header 'PreviousHash' (hash of block number, data and PreviousHash - think of it as a link to the previous block)
+// This func compares current block header 'PreviousHash'
+// (hash of block number, data and PreviousHash -
+// think of it as a link to the previous block)
 // with actual previous block header hash.
 func CheckIntegrity(previousblock, currentblock *Block) bool {
 	return bytes.Equal(previousblock.headerhash, currentblock.prevhash)
@@ -127,9 +143,17 @@ func CheckIntegrity(previousblock, currentblock *Block) bool {
 // FromBFTFabricBlock converts common.Block produced by BFT-orderer to blocklib.Block.
 func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error) {
 	metadata := &common.Metadata{}
-	err := proto.Unmarshal(block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES], metadata)
+
+	err := proto.Unmarshal(
+		block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES],
+		metadata,
+	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling metadata from block at index [%s]", common.BlockMetadataIndex_SIGNATURES)
+		return nil, errors.Wrapf(
+			err,
+			"error unmarshaling metadata from block at index [%s]",
+			common.BlockMetadataIndex_SIGNATURES,
+		)
 	}
 
 	identities, err := GetBFTOrderersIdentities(cli, block)
@@ -138,16 +162,19 @@ func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error)
 	}
 
 	var blockSignatures []BlockSignature
+
 	for _, metadataSignature := range metadata.Signatures {
 		sigHdr := &common.SignatureHeader{}
-		if err := proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
+		if err = proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
 			return nil, errors.Wrap(err, "error unmarshaling SignatureHeader")
 		}
 
 		creator := &msp.SerializedIdentity{}
+
 		if err = proto.Unmarshal(sigHdr.Creator, creator); err != nil {
 			return nil, err
 		}
+
 		for _, identity := range identities {
 			blockSignatures = append(blockSignatures,
 				BlockSignature{
@@ -161,17 +188,19 @@ func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error)
 	}
 
 	envelope := &common.Envelope{}
-	if err := proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
+	if err = proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
 		return nil, err
 	}
 
 	payload := &common.Payload{}
+
 	err = proto.Unmarshal(envelope.Payload, payload)
 	if err != nil {
 		return nil, err
 	}
 
 	hdr := &common.ChannelHeader{}
+
 	err = proto.Unmarshal(payload.Header.ChannelHeader, hdr)
 	if err != nil {
 		return nil, err
@@ -193,21 +222,31 @@ func FromBFTFabricBlock(cli *ledger.Client, block *common.Block) (*Block, error)
 		datahash:   block.Header.DataHash,
 		headerhash: headerHash[:],
 		txsFilter:  filter,
-		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
+		isconfig: common.HeaderType(hdr.Type) == common.HeaderType_CONFIG ||
+			common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
 	}, nil
 }
 
 func FromBFTFabricBlockWithoutOrdererIdenities(block *common.Block) (*Block, error) {
 	metadata := &common.Metadata{}
-	err := proto.Unmarshal(block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES], metadata)
+
+	err := proto.Unmarshal(
+		block.Metadata.Metadata[common.BlockMetadataIndex_SIGNATURES],
+		metadata,
+	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling metadata from block at index [%s]", common.BlockMetadataIndex_SIGNATURES)
+		return nil, errors.Wrapf(
+			err,
+			"error unmarshaling metadata from block at index [%s]",
+			common.BlockMetadataIndex_SIGNATURES,
+		)
 	}
 
-	var blockSignatures []BlockSignature
+	blockSignatures := make([]BlockSignature, len(metadata.Signatures))
+
 	for _, metadataSignature := range metadata.Signatures {
 		sigHdr := &common.SignatureHeader{}
-		if err := proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
+		if err = proto.Unmarshal(metadataSignature.SignatureHeader, sigHdr); err != nil {
 			return nil, errors.Wrap(err, "error unmarshaling SignatureHeader")
 		}
 
@@ -215,6 +254,7 @@ func FromBFTFabricBlockWithoutOrdererIdenities(block *common.Block) (*Block, err
 		if err = proto.Unmarshal(sigHdr.Creator, creator); err != nil {
 			return nil, err
 		}
+
 		blockSignatures = append(blockSignatures,
 			BlockSignature{
 				Cert:      nil,
@@ -226,17 +266,19 @@ func FromBFTFabricBlockWithoutOrdererIdenities(block *common.Block) (*Block, err
 	}
 
 	envelope := &common.Envelope{}
-	if err := proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
+	if err = proto.Unmarshal(block.Data.Data[0], envelope); err != nil {
 		return nil, err
 	}
 
 	payload := &common.Payload{}
+
 	err = proto.Unmarshal(envelope.Payload, payload)
 	if err != nil {
 		return nil, err
 	}
 
 	hdr := &common.ChannelHeader{}
+
 	err = proto.Unmarshal(payload.Header.ChannelHeader, hdr)
 	if err != nil {
 		return nil, err
@@ -258,11 +300,15 @@ func FromBFTFabricBlockWithoutOrdererIdenities(block *common.Block) (*Block, err
 		datahash:   block.Header.DataHash,
 		headerhash: headerHash[:],
 		txsFilter:  filter,
-		isconfig:   common.HeaderType(hdr.Type) == common.HeaderType_CONFIG || common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
+		isconfig: common.HeaderType(hdr.Type) == common.HeaderType_CONFIG ||
+			common.HeaderType(hdr.Type) == common.HeaderType_ORDERER_TRANSACTION,
 	}, nil
 }
 
-func GetBFTOrderersIdentities(cli *ledger.Client, blk *common.Block) ([]BFTSerializedIdentity, error) {
+func GetBFTOrderersIdentities(
+	cli *ledger.Client,
+	blk *common.Block,
+) ([]BFTSerializedIdentity, error) {
 	if blk.Metadata == nil {
 		return nil, errors.New("no metadata in block")
 	}
@@ -278,53 +324,75 @@ func GetBFTOrderersIdentities(cli *ledger.Client, blk *common.Block) ([]BFTSeria
 		return nil, fmt.Errorf("couldn't unmarshal block metadata: %w", err)
 	}
 
-	identities := make([]BFTSerializedIdentity, 0, len(md.Signatures))
 	lc := common.LastConfig{}
+
 	if err := proto.Unmarshal(md.Value, &lc); err == nil {
-		if cfgBlock, err := cli.QueryBlock(lc.Index); err == nil {
-			if configEnvelope, err := resource.CreateConfigEnvelope(cfgBlock.Data.Data[0]); err == nil {
-				identities, err = getOrderersIdentities((*common.ConfigEnvelope)(unsafe.Pointer(configEnvelope)))
-				if err != nil {
-					return nil, fmt.Errorf("couldn't extract orderers identities: %w", err)
-				}
-			}
-		}
+		return nil, err
+	}
+
+	cfgBlock, err := cli.QueryBlock(lc.Index)
+	if err != nil {
+		return nil, err
+	}
+
+	configEnvelope, err := resource.CreateConfigEnvelope(cfgBlock.Data.Data[0])
+	if err != nil {
+		return nil, err
+	}
+
+	identities, err := getOrderersIdentities(configEnvelope)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't extract orderers identities: %w", err)
 	}
 
 	// filter 'identities' slice (all channel orderers) to find those which signed this block
 	var filteredIdentities []BFTSerializedIdentity
+
 	for _, identity := range identities {
 		for _, signature := range md.Signatures {
-			if identity.ConsenterId == signature.SignerId {
+			if identity.ConsenterID == signature.SignerId {
 				filteredIdentities = append(filteredIdentities, identity)
 			}
 		}
 	}
+
 	return filteredIdentities, nil
 }
 
 func getOrderersIdentities(envelope *common.ConfigEnvelope) ([]BFTSerializedIdentity, error) {
-	consensusType := envelope.Config.ChannelGroup.Groups["Orderer"].Values["ConsensusType"].Value
+	consensusType := envelope.Config.
+		ChannelGroup.Groups["Orderer"].
+		Values["ConsensusType"].Value
 
 	ct := &orderer.ConsensusType{}
+
 	err := proto.Unmarshal(consensusType, ct)
 	if err != nil {
-		return nil, fmt.Errorf("Failed unmarshaling ConsensusType from consensusType: %v", err)
+		return nil, fmt.Errorf("failed unmarshaling consensus type from consensusType: %w", err)
 	}
 
 	m := &smartbft.ConfigMetadata{}
+
 	err = proto.Unmarshal(ct.Metadata, m)
 	if err != nil {
-		return nil, fmt.Errorf("Failed unmarshaling ConfigMetadata from metadata: %v", err)
+		return nil, fmt.Errorf("failed unmarshaling config metadata from metadata: %w", err)
 	}
 
 	identity := msp.SerializedIdentity{}
-	var identities []BFTSerializedIdentity
+	identities := make([]BFTSerializedIdentity, 0, len(m.Consenters))
+
 	for _, consenter := range m.Consenters {
 		if err = proto.Unmarshal(consenter.Identity, &identity); err != nil {
 			return nil, err
 		}
-		identities = append(identities, BFTSerializedIdentity{consenter.ConsenterId, identity})
+
+		identities = append(
+			identities,
+			BFTSerializedIdentity{
+				consenter.ConsenterId,
+				identity,
+			},
+		)
 	}
 
 	return identities, nil
@@ -345,12 +413,12 @@ func (b *Block) PreviousHash() []byte {
 	return b.prevhash
 }
 
-// DataHash returns hash of the this block's data.
+// DataHash returns hash of this block's data.
 func (b *Block) DataHash() []byte {
 	return b.datahash
 }
 
-// HeaderHash returns hash of the this block's header.
+// HeaderHash returns hash of this block's header.
 func (b *Block) HeaderHash() []byte {
 	return b.headerhash
 }
@@ -362,11 +430,12 @@ func (b *Block) OrderersSignatures() []BlockSignature {
 
 func (b *Block) Txs() ([]Tx, error) {
 	var (
-		validationCode   int32  = 255
-		validationStatus string = "INVALID_OTHER_REASON"
+		validationCode   int32 = 255
+		validationStatus       = "INVALID_OTHER_REASON"
 	)
 
-	var txs []Tx
+	txs := make([]Tx, 0, len(b.Data))
+
 	for txNumber, data := range b.Data {
 		if b.IsConfig() {
 			txs = append(txs, Tx{Data: data, validationCode: 0, validationStatus: ""})
@@ -380,15 +449,20 @@ func (b *Block) Txs() ([]Tx, error) {
 			txs = append(txs, Tx{Data: data, validationCode: validationCode, validationStatus: validationStatus})
 		}
 	}
+
 	return txs, nil
 }
 
-// TxsFromOrdererBlock returns transactions from orderer block without validation code and validation status, because odrerer ledger does not contain them.
+// TxsFromOrdererBlock returns transactions from orderer block
+// without validation code and validation status,
+// because odrerer ledger does not contain them.
 func (b *Block) TxsFromOrdererBlock() ([]Tx, error) {
-	var txs []Tx
+	txs := make([]Tx, 0, len(b.Data))
+
 	for _, data := range b.Data {
 		txs = append(txs, Tx{Data: data})
 	}
+
 	return txs, nil
 }
 
@@ -396,14 +470,18 @@ func (b *Block) TxsFromOrdererBlock() ([]Tx, error) {
 func (b *Block) LastConfig() (uint64, error) {
 	lastConfig := &common.LastConfig{}
 	err := proto.Unmarshal(b.Metadata[common.BlockMetadataIndex_LAST_CONFIG], lastConfig)
+
 	return lastConfig.Index, err
 }
 
 func GetTx(block *common.Block, txNumber int) *Tx {
-	txsFilter := TxValidationFlags(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
+	txsFilter := TxValidationFlags(
+		block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER],
+	)
+
 	var (
-		validationCode   int32  = 255
-		validationStatus string = "INVALID_OTHER_REASON"
+		validationCode   int32 = 255
+		validationStatus       = "INVALID_OTHER_REASON"
 	)
 
 	for _, code := range peer.TxValidationCode_value {
@@ -413,7 +491,11 @@ func GetTx(block *common.Block, txNumber int) *Tx {
 		}
 	}
 
-	return &Tx{Data: block.Data.Data[txNumber], validationCode: validationCode, validationStatus: validationStatus}
+	return &Tx{
+		Data:             block.Data.Data[txNumber],
+		validationCode:   validationCode,
+		validationStatus: validationStatus,
+	}
 }
 
 type asn1Header struct {
@@ -423,17 +505,19 @@ type asn1Header struct {
 }
 
 func BlockHeaderBytes(b *common.BlockHeader) []byte {
-	asn1Header := asn1Header{
+	ah := asn1Header{
 		PreviousHash: b.PreviousHash,
 		DataHash:     b.DataHash,
 		Number:       new(big.Int).SetUint64(b.Number),
 	}
-	result, err := asn1.Marshal(asn1Header)
+
+	result, err := asn1.Marshal(ah)
 	if err != nil {
 		// Errors should only arise for types which cannot be encoded, since the
 		// BlockHeader type is known a-priori to contain only encodable types, an
 		// error here is fatal and should not be propogated
 		panic(err)
 	}
+
 	return result
 }

@@ -7,9 +7,10 @@ package storageadapter
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/newity/crawler/parser"
 	"github.com/newity/crawler/storage"
-	"strconv"
 )
 
 type SimpleAdapter struct {
@@ -25,6 +26,7 @@ func (s *SimpleAdapter) Inject(data *parser.Data) error {
 	if err != nil {
 		return err
 	}
+
 	return s.storage.Put(strconv.Itoa(int(data.BlockNumber)), encoded)
 }
 
@@ -33,9 +35,13 @@ func (s *SimpleAdapter) Retrieve(blocknum string) (*parser.Data, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return Decode(value)
 }
 
-func (s *SimpleAdapter) ReadStream(_ context.Context, blocknum string) (<-chan *parser.Data, <-chan error) {
+func (s *SimpleAdapter) ReadStream(
+	_ context.Context,
+	_ string, // blocknum
+) (<-chan *parser.Data, <-chan error) {
 	return nil, nil
 }

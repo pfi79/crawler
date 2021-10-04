@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/pubsub v1.8.2
 	github.com/cloudflare/cfssl v1.5.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2
-	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.3
 	github.com/hyperledger/fabric-protos-go v0.0.0-20200707132912-fee30f3ccd23
 	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20210927191040-3e3a3c6aeec9

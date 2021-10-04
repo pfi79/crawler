@@ -8,7 +8,8 @@ package blocklib
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/gogo/protobuf/proto"
+
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset"
 	"github.com/hyperledger/fabric-protos-go/ledger/rwset/kvrwset"
@@ -28,7 +29,8 @@ type Action struct {
 }
 
 // ChaincodeActionPayload returns pointer to peer.ChaincodeActionPayload.
-// ChaincodeActionPayload is the message to be used for the TransactionAction's payload when the Header's type is set to CHAINCODE.
+// ChaincodeActionPayload is the message to be used for the TransactionAction's
+// payload when the Header's type is set to CHAINCODE.
 // It carries the chaincodeProposalPayload and an endorsed action to apply to the ledger.
 func (a *Action) ChaincodeActionPayload() *peer.ChaincodeActionPayload {
 	return a.Payload
@@ -36,10 +38,14 @@ func (a *Action) ChaincodeActionPayload() *peer.ChaincodeActionPayload {
 
 // Endorsements returns a slice of pointers to peer.Endorsement.
 // An endorsement is a signature of an endorser over a proposal response.
-// By producing an endorsement message, an endorser implicitly "approves" that proposal response and the actions contained therein.
-// When enough endorsements have been collected, a transaction can be generated out of a set of proposal responses.
+// By producing an endorsement message, an endorser implicitly "approves"
+// that proposal response and the actions contained therein.
+// When enough endorsements have been collected, a transaction
+// can be generated out of a set of proposal responses.
 // Note that this message only contains an identity and a signature but no signed payload.
-// This is intentional because endorsements are supposed to be collected in a transaction, and they are all expected to endorse a single proposal response/action (many endorsements over a single proposal response).
+// This is intentional because endorsements are supposed to be collected in
+// a transaction, and they are all expected to endorse a single proposal
+// response/action (many endorsements over a single proposal response).
 func (a *Action) Endorsements() []*peer.Endorsement {
 	return a.Payload.Action.Endorsements
 }
@@ -48,6 +54,7 @@ func (a *Action) Endorsements() []*peer.Endorsement {
 func (a *Action) CreatorMSPID() (string, error) {
 	creator := &msp.SerializedIdentity{}
 	err := proto.Unmarshal(a.SignatureHeader.Creator, creator)
+
 	return creator.Mspid, err
 }
 
@@ -55,6 +62,7 @@ func (a *Action) CreatorMSPID() (string, error) {
 func (a *Action) CreatorCertBytes() ([]byte, error) {
 	creator := &msp.SerializedIdentity{}
 	err := proto.Unmarshal(a.SignatureHeader.Creator, creator)
+
 	return creator.IdBytes, err
 }
 
@@ -64,8 +72,10 @@ func (a *Action) CreatorCertHashHex() (string, error) {
 	if err := proto.Unmarshal(a.SignatureHeader.Creator, creator); err != nil {
 		return "", err
 	}
+
 	certHash := sha256.New()
 	certHash.Write(creator.IdBytes)
+
 	return hex.EncodeToString(certHash.Sum(nil)), nil
 }
 
@@ -74,6 +84,7 @@ func (a *Action) CreatorCertHashHex() (string, error) {
 func (a *Action) ChaincodeProposalPayload() (*peer.ChaincodeProposalPayload, error) {
 	ccProposalPayload := &peer.ChaincodeProposalPayload{}
 	err := proto.Unmarshal(a.Payload.ChaincodeProposalPayload, ccProposalPayload)
+
 	return ccProposalPayload, err
 }
 
@@ -83,10 +94,11 @@ func (a *Action) ChaincodeInput() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	input := &peer.ChaincodeInvocationSpec{}
 	err = proto.Unmarshal(ccProposalPayload.Input, input)
+	args := make([]string, 0, len(input.ChaincodeSpec.Input.Args))
 
-	var args []string
 	for _, arg := range input.ChaincodeSpec.Input.Args {
 		args = append(args, string(arg))
 	}
@@ -95,25 +107,32 @@ func (a *Action) ChaincodeInput() ([]string, error) {
 }
 
 // IsInit returns true (is Init invoked) or false (not Init invoked).
-// is_init is used for the application to signal that an invocation is to be routed to the legacy 'Init' function for compatibility with chaincodes which handled Init in the old way.
+// is_init is used for the application to signal that an invocation is
+// to be routed to the legacy 'Init' function for compatibility
+// with chaincodes which handled Init in the old way.
 // New applications should manage their initialized state themselves.
 func (a *Action) IsInit() (bool, error) {
 	ccProposalPayload, err := a.ChaincodeProposalPayload()
 	if err != nil {
 		return false, err
 	}
+
 	input := &peer.ChaincodeInvocationSpec{}
 	err = proto.Unmarshal(ccProposalPayload.Input, input)
+
 	return input.ChaincodeSpec.Input.IsInit, err
 }
 
-// TransientMap contains data (e.g. cryptographic material) that might be used to implement some form of application-level confidentiality.
-// The contents of this field are supposed to always be omitted from the transaction and excluded from the ledger.
+// TransientMap contains data (e.g. cryptographic material) that might
+// be used to implement some form of application-level confidentiality.
+// The contents of this field are supposed to always be omitted
+// from the transaction and excluded from the ledger.
 func (a *Action) TransientMap() (map[string][]byte, error) {
 	ccProposalPayload, err := a.ChaincodeProposalPayload()
 	if err != nil {
 		return nil, err
 	}
+
 	return ccProposalPayload.TransientMap, nil
 }
 
@@ -128,43 +147,56 @@ func (a *Action) Decorations() (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	input := &peer.ChaincodeInvocationSpec{}
-	err = proto.Unmarshal(ccProposalPayload.Input, input)
 
-	var args []string
-	for _, arg := range input.ChaincodeSpec.Input.Args {
-		args = append(args, string(arg))
+	input := &peer.ChaincodeInvocationSpec{}
+
+	err = proto.Unmarshal(ccProposalPayload.Input, input)
+	if err != nil {
+		return nil, err
 	}
+
 	return input.ChaincodeSpec.Input.Decorations, nil
 }
 
 // ProposalResponsePayload returns a pointer to peer.ProposalResponsePayload.
 // ProposalResponsePayload is the payload of a proposal response.
-// This message is the "bridge" between the client's request and the endorser's action in response to that request.
-// Concretely, for chaincodes, it contains a hashed representation of the proposal (proposalHash) and a representation of the chaincode state changes and events inside the extension field.
+// This message is the "bridge" between the client's request and
+// the endorser's action in response to that request.
+// Concretely, for chaincodes, it contains a hashed representation of
+// the proposal (proposalHash) and a representation of the chaincode
+// state changes and events inside the extension field.
 func (a *Action) ProposalResponsePayload() (*peer.ProposalResponsePayload, error) {
 	proposalResponsePayload := &peer.ProposalResponsePayload{}
-	err := proto.Unmarshal(a.Payload.Action.ProposalResponsePayload, proposalResponsePayload)
+	err := proto.Unmarshal(
+		a.Payload.Action.ProposalResponsePayload,
+		proposalResponsePayload,
+	)
+
 	return proposalResponsePayload, err
 }
 
-// ProposalHash returns SHA256 hash of common.ChannelHeader, common.SignatureHeader and peer.ProposalResponsePayload.
+// ProposalHash returns SHA256 hash of common.ChannelHeader,
+// common.SignatureHeader and peer.ProposalResponsePayload.
 func (a *Action) ProposalHash() ([]byte, error) {
 	proposalResponsePayload, err := a.ProposalResponsePayload()
 	if err != nil {
 		return nil, err
 	}
+
 	return proposalResponsePayload.ProposalHash, nil
 }
 
-// ChaincodeAction returns a pointer to peer.ChaincodeAction that contains and actions the events generated by the execution of the chaincode.
+// ChaincodeAction returns a pointer to peer.ChaincodeAction that contains and
+// actions the events generated by the execution of the chaincode.
 func (a *Action) ChaincodeAction() (*peer.ChaincodeAction, error) {
 	proposalResponsePayload, err := a.ProposalResponsePayload()
 	if err != nil {
 		return nil, err
 	}
+
 	chaincodeAction := &peer.ChaincodeAction{}
 	err = proto.Unmarshal(proposalResponsePayload.Extension, chaincodeAction)
+
 	return chaincodeAction, err
 }
 
@@ -174,8 +206,10 @@ func (a *Action) ChaincodeEvent() (*peer.ChaincodeEvent, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	chaincodeEvent := &peer.ChaincodeEvent{}
 	err = proto.Unmarshal(chaincodeAction.Events, chaincodeEvent)
+
 	return chaincodeEvent, err
 }
 
@@ -187,17 +221,22 @@ func (a *Action) RWSets() ([]RwSet, error) {
 	}
 
 	txReadWriteSet := &rwset.TxReadWriteSet{}
-	if err := proto.Unmarshal(chaincodeAction.Results, txReadWriteSet); err != nil {
+	if err = proto.Unmarshal(
+		chaincodeAction.Results,
+		txReadWriteSet,
+	); err != nil {
 		return nil, err
 	}
 
 	result := make([]RwSet, len(txReadWriteSet.NsRwset))
 	for i, rwSet := range txReadWriteSet.NsRwset {
 		result[i].NameSpace = rwSet.Namespace
-		if err := proto.Unmarshal(rwSet.Rwset, &result[i].KVRWSet); err != nil {
+		if err = proto.Unmarshal(rwSet.Rwset, &result[i].KVRWSet); err != nil {
 			return nil, err
 		}
+
 		result[i].CollectionHashedReadWriteSet = rwSet.CollectionHashedRwset
 	}
+
 	return result, err
 }
