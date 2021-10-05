@@ -114,7 +114,7 @@ func (n *Nats) Close() error {
 }
 
 func SubscriptionMgr(conn stan.Conn, subject string, cb stan.MsgHandler, opts ...stan.SubscriptionOption) (*stan.Subscription, error) {
-	sub, err := conn.Subscribe(subject, cb, opts...)
+	sub, err := conn.QueueSubscribe(subject, subject, cb, opts...)
 	if err != nil {
 		return nil, err
 	}
