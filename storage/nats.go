@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package storage
 
 import (
+	"context"
 	"errors"
 	stan "github.com/nats-io/stan.go"
 	log "github.com/sirupsen/logrus"
@@ -61,9 +62,9 @@ func (n *Nats) Put(topic string, msg []byte) error {
 }
 
 // Get reads one message from the topic and closes channel.
-func (n *Nats) Get(topic string) ([]byte, error) {
+func (n *Nats) Get(ctx context.Context, topic string) ([]byte, error) {
 	var data []byte
-	sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
+	sub, err := SubscriptionMgr(ctx, n.Connection, topic, func(m *stan.Msg) {
 		data = m.Data
 		if err := m.Ack(); err != nil {
 			log.Errorf("failed to ack message, %v", err)
@@ -74,13 +75,13 @@ func (n *Nats) Get(topic string) ([]byte, error) {
 }
 
 // GetStream reads a stream of messages from topic and writes them to the channel.
-func (n *Nats) GetStream(topic string) (<-chan []byte, <-chan error) {
+func (n *Nats) GetStream(ctx context.Context, topic string) (<-chan []byte, <-chan error) {
 	ch, errch := make(chan []byte), make(chan error)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
+		sub, err := SubscriptionMgr(ctx, n.Connection, topic, func(m *stan.Msg) {
 			ch <- m.Data
 			if err := m.Ack(); err != nil {
 				log.Errorf("failed to ack message, %v", err)
@@ -113,29 +114,37 @@ func (n *Nats) Close() error {
 	return n.Connection.Close()
 }
 
-func SubscriptionMgr(conn stan.Conn, subject string, cb stan.MsgHandler, opts ...stan.SubscriptionOption) (*stan.Subscription, error) {
+func SubscriptionMgr(ctx context.Context, conn stan.Conn, subject string, cb stan.MsgHandler, opts ...stan.SubscriptionOption) (*stan.Subscription, error) {
 	sub, err := conn.QueueSubscribe(subject, subject, cb, opts...)
 	if err != nil {
 		return nil, err
 	}
 	subptr := &sub
-	t := time.NewTicker(3 * time.Second)
 	var validSub bool
+	t := time.NewTicker(3 * time.Second)
 	go func() {
-		for range t.C {
-			if !sub.IsValid() {
-				validSub = false
-				log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
-				sub, err = conn.Subscribe(subject, cb, opts...)
-				if err != nil {
-					panic(err)
+	OuterLoop:
+		for {
+			select {
+			case <-t.C:
+				if !sub.IsValid() {
+					validSub = false
+					log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+					sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
+					if err != nil {
+						panic(err)
+					}
+					subptr = &sub
+				} else {
+					if !validSub {
+						log.Infof("Subscription to %s restored", subject)
+					}
+					validSub = true
 				}
-				subptr = &sub
-			} else {
-				if !validSub {
-					log.Infof("Subscription to %s restored", subject)
-				}
-				validSub = true
+			case <-ctx.Done():
+				log.Warnf("stop resubscriber for %s", subject)
+				subptr = nil
+				break OuterLoop
 			}
 		}
 	}()

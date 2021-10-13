@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package storage
 
 import (
+	"context"
 	badger "github.com/dgraph-io/badger/v2"
 	"os"
 	"strconv"
@@ -41,7 +42,7 @@ func (b *Badger) Put(key string, value []byte) error {
 }
 
 // Get retrieves data from BadgerDB using key
-func (b *Badger) Get(key string) ([]byte, error) {
+func (b *Badger) Get(_ context.Context, key string) ([]byte, error) {
 	var value []byte
 	err := b.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -68,6 +69,6 @@ func (b *Badger) Close() error {
 	return b.db.Close()
 }
 
-func (b *Badger) GetStream(key string) (<-chan []byte, <-chan error) {
+func (b *Badger) GetStream(_ context.Context, key string) (<-chan []byte, <-chan error) {
 	return nil, nil
 }
