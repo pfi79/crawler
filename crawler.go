@@ -29,6 +29,7 @@ SPDX-License-Identifier: Apache-2.0
 package crawler
 
 import (
+	"context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	contextApi "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
@@ -104,6 +105,7 @@ func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 
 	// if no storage adapter is specified, use the default SimpleAdapter
 	if crawl.adapter == nil {
+
 		crawl.adapter = storageadapter.NewSimpleAdapter(crawl.storage)
 	}
 
@@ -234,6 +236,6 @@ func (c *Crawler) GetFromStorage(key string) (*parser.Data, error) {
 	return c.adapter.Retrieve(key)
 }
 
-func (c *Crawler) ReadStreamFromStorage(key string) (<-chan *parser.Data, <-chan error) {
-	return c.adapter.ReadStream(key)
+func (c *Crawler) ReadStreamFromStorage(ctx context.Context, key string) (<-chan *parser.Data, <-chan error) {
+	return c.adapter.ReadStream(ctx, key)
 }
