@@ -41,7 +41,18 @@ func (r *Rabbit) InitChannelsStorage(channels []string) error {
 
 	r.RabbitCh = ch
 	for _, channel := range channels {
-		_, err = ch.QueueDeclare(
+		if err = r.RabbitCh.ExchangeDeclare(
+			channel,
+			"topic",
+			true,
+			false,
+			false,
+			false,
+			nil,
+		); err != nil {
+			return err
+		}
+		_, err = r.RabbitCh.QueueDeclare(
 			channel, // name
 			false,   // durable
 			false,   // delete when unused
