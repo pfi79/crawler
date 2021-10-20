@@ -16,6 +16,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.6.0
 	github.com/sirupsen/logrus v1.7.0
+	github.com/streadway/amqp v1.0.0 // indirect
 	github.com/stretchr/testify v1.5.1
 	google.golang.org/api v0.34.0
 )
