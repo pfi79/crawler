@@ -13,6 +13,7 @@ type Rabbit struct {
 	Connection *amqp.Connection
 	channels   []string
 	RabbitCh   *amqp.Channel
+	confirms   chan amqp.Confirmation
 }
 
 func NewRabbit(rabbitUser, rabbitPass, server string) (*Rabbit, error) {
@@ -31,12 +32,17 @@ func (r *Rabbit) InitChannelsStorage(channels []string) error {
 
 	ch, err := r.Connection.Channel()
 	if err != nil {
-		return fmt.Errorf("Failed to open a channel")
+		return fmt.Errorf("Failed to open a RabbitMQ channel")
 	}
+	r.confirms = ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	if err = ch.Confirm(false); err != nil {
+		return fmt.Errorf("failed to put RabbitMQ channel into confirm mode")
+	}
+
 	r.RabbitCh = ch
 	for _, channel := range channels {
 		_, err = ch.QueueDeclare(
-			"hello", // name
+			channel, // name
 			false,   // durable
 			false,   // delete when unused
 			false,   // exclusive
@@ -53,7 +59,7 @@ func (r *Rabbit) InitChannelsStorage(channels []string) error {
 
 // Put stores message to topic.
 func (r *Rabbit) Put(topic string, msg []byte) error {
-	return r.RabbitCh.Publish(
+	err := r.RabbitCh.Publish(
 		"",    // exchange
 		topic, // routing key
 		false, // mandatory
@@ -62,6 +68,13 @@ func (r *Rabbit) Put(topic string, msg []byte) error {
 			ContentType: "application/octet-stream",
 			Body:        msg,
 		})
+	if err != nil {
+		return err
+	}
+	if confirmed := <-r.confirms; !confirmed.Ack {
+		return fmt.Errorf("delivery (tag %d) is not confirmed by RabbitMQ", confirmed.DeliveryTag)
+	}
+	return nil
 }
 
 // Get reads one message from the topic.
