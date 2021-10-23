@@ -90,21 +90,15 @@ func (r *Rabbit) Put(topic string, msg []byte) error {
 
 // Get reads one message from the topic.
 func (r *Rabbit) Get(topic string) ([]byte, error) {
-	msgs, err := r.RabbitCh.Consume(
-		topic, // queue
-		"",    // consumer
-		true,  // auto-ack
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
-	)
+	msg, _, err := r.RabbitCh.Get(topic, false)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to register a consumer for a queue %s", topic)
+		return nil, fmt.Errorf("Failed to get a message from a queue %s", topic)
 	}
-
-	d := <-msgs
-	return d.Body, nil
+	encoded, err := storageadapter.EncodeRabbitMsg(&msg)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to serialize a message %s", topic)
+	}
+	return encoded, nil
 }
 
 // GetStream reads a stream of messages from topic and writes them to the channel.
