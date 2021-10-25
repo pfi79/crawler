@@ -127,20 +127,21 @@ func SubscriptionMgr(ctx context.Context, conn stan.Conn, subject string, cb sta
 		for {
 			select {
 			case <-t.C:
-				if !sub.IsValid() {
-					validSub = false
-					log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
-					sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
-					if err != nil {
-						panic(err)
+				if sub == nil || (sub != nil && !sub.IsValid()) {
+					if conn.NatsConn() != nil {
+						validSub = false
+						log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+						sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
+						if err != nil {
+							panic(err)
+						}
+						subptr = &sub
+					} else {
+						if !validSub {
+							log.Infof("Subscription to %s restored", subject)
+						}
+						validSub = true
 					}
-					subptr = &sub
-				} else {
-					if !validSub {
-						log.Infof("Subscription to %s restored", subject)
-					}
-					validSub = true
-				}
 			case <-ctx.Done():
 				log.Warnf("stop resubscriber for %s", subject)
 				subptr = nil
