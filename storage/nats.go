@@ -136,12 +136,13 @@ func SubscriptionMgr(ctx context.Context, conn stan.Conn, subject string, cb sta
 							panic(err)
 						}
 						subptr = &sub
-					} else {
-						if !validSub {
-							log.Infof("Subscription to %s restored", subject)
-						}
-						validSub = true
 					}
+				} else {
+					if !validSub {
+						log.Infof("Subscription to %s restored", subject)
+					}
+					validSub = true
+				}
 			case <-ctx.Done():
 				log.Warnf("stop resubscriber for %s", subject)
 				subptr = nil
