@@ -31,9 +31,10 @@ func NatsConnMonitor(nats *Nats, clusterID string, opts ...stan.Option) {
 			conn, err := stan.Connect(clusterID, clientID, opts...)
 			if err != nil {
 				log.Error(err)
+			} else {
+				log.Infof("connection to the NATS established (client ID: %s)", clientID)
+				nats.Connection = conn
 			}
-			log.Infof("connection to the NATS established (client ID: %s)", clientID)
-			nats.Connection = conn
 		}
 	}
 }
