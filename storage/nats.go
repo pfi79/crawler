@@ -11,6 +11,7 @@ import (
 	"errors"
 	stan "github.com/nats-io/stan.go"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -21,16 +22,17 @@ type Nats struct {
 	subscriptions []*stan.Subscription
 }
 
-func NatsConnMonitor(nats *Nats, clusterID, clientID string, opts ...stan.Option) {
+func NatsConnMonitor(nats *Nats, clusterID string, opts ...stan.Option) {
 	t := time.NewTicker(3 * time.Second)
 	for range t.C {
 		if nats.Connection == nil || nats.Connection != nil && nats.Connection.NatsConn() != nil {
 			log.Warnf("reestablish connection to the NATS")
+			clientID := strconv.Itoa(int(time.Now().UnixNano()))
 			conn, err := stan.Connect(clusterID, clientID, opts...)
 			if err != nil {
 				log.Error(err)
 			}
-			log.Info("connection to the NATS established")
+			log.Infof("connection to the NATS established (client ID: %s)", clientID)
 			nats.Connection = conn
 		}
 	}
@@ -46,7 +48,7 @@ func NewNats(clusterID, clientID string, opts ...stan.Option) (*Nats, error) {
 		Connection: conn,
 	}
 
-	go NatsConnMonitor(n, clusterID, clientID, opts...)
+	go NatsConnMonitor(n, clusterID, opts...)
 
 	return n, nil
 }
