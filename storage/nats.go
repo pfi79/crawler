@@ -24,7 +24,7 @@ type Nats struct {
 func NatsConnMonitor(nats *Nats, clusterID, clientID string, opts ...stan.Option) {
 	t := time.NewTicker(3 * time.Second)
 	for range t.C {
-		if nats.Connection == nil {
+		if nats.Connection == nil || nats.Connection != nil && nats.Connection.NatsConn() != nil {
 			log.Warnf("reestablish connection to the NATS")
 			conn, err := stan.Connect(clusterID, clientID, opts...)
 			if err != nil {
