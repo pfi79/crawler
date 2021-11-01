@@ -8,12 +8,14 @@ package crawler
 import (
 	"fmt"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/newity/crawler/parser"
 	"github.com/newity/crawler/storage"
 	"github.com/newity/crawler/storageadapter"
+	"time"
 )
 
 type Option func(crawler *Crawler) error
@@ -103,6 +105,12 @@ const (
 func FromBlock() ListenOpt {
 	return func() interface{} {
 		return LISTEN_FROM
+	}
+}
+
+func WithEventConsumerTimeout(value time.Duration) ListenOpt {
+	return func() interface{} {
+		return event.WithEventConsumerTimeout(value)
 	}
 }
 
