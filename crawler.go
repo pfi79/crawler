@@ -152,6 +152,8 @@ func (c *Crawler) Listen(opts ...ListenOpt) error {
 		switch opt().(type) {
 		case string:
 			listenType = opt().(string)
+		case event.ClientOption:
+			clientOpts = append([]event.ClientOption{}, opt().(event.ClientOption))
 		default:
 			fromBlock = uint64(opt().(int))
 		}
