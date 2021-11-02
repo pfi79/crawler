@@ -200,6 +200,10 @@ func (c *Crawler) ListenerForChannel(channel string) <-chan *fab.BlockEvent {
 func (c *Crawler) StopListenChannel(channel string) {
 	for ch, eventcli := range c.eventCli {
 		if channel == ch {
+			go func() { // dirty hack to force dispatcher handle disconenct event
+				for range c.notifiers[ch] {
+				}
+			}()
 			eventcli.Unregister(c.registrations[ch])
 		}
 	}
@@ -208,6 +212,10 @@ func (c *Crawler) StopListenChannel(channel string) {
 // StopListenAll removes the registration for block events from all channels and closes these channels
 func (c *Crawler) StopListenAll() {
 	for ch, eventcli := range c.eventCli {
+		go func() { // dirty hack to force dispatcher handle disconenct event
+			for range c.notifiers[ch] {
+			}
+		}()
 		eventcli.Unregister(c.registrations[ch])
 	}
 }
