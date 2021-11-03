@@ -244,6 +244,10 @@ func (c *Crawler) Run() {
 	}
 }
 
+// RunBatched works like Run, but collects parsed data into the batch.
+// To form a batch, one of the following conditions must be met:
+// 1) the _limit_ of blocks in the batch is exceeded;
+// 2) a timeout (_timer_) has passed for the formation and sending of the batch.
 func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 	for _, notifier := range c.notifiers {
 		go func(notifier <-chan *fab.BlockEvent) {
