@@ -248,13 +248,14 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 	for _, notifier := range c.notifiers {
 		go func(notifier <-chan *fab.BlockEvent) {
 			var (
-				batch   parser.Data
-				nblocks uint32
+				batch                 parser.Data
+				nblocks               uint32
+				firstBlockInBatchTime *time.Timer
 			)
-			var firstBlockInBatchTime time.Time
+
 			for blockevent := range notifier {
 				if nblocks == 0 {
-					firstBlockInBatchTime = time.Now()
+					firstBlockInBatchTime = time.NewTimer(timer)
 				}
 				data, err := c.parser.Parse(blockevent.Block)
 				if err != nil {
@@ -264,20 +265,36 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 				if data == nil {
 					continue
 				}
-				if nblocks <= limit || (time.Since(firstBlockInBatchTime).Nanoseconds() >= timer.Nanoseconds()) {
-					batch.Txs = append(batch.Txs, data.Txs...)
-					batch.BlockNumber = batch.BlockNumber
-					batch.BlockSignatures = batch.BlockSignatures
-					batch.Datahash = batch.Datahash
-					batch.Events = batch.Events
-					batch.Txs = append(batch.Txs, data.Txs...)
-					nblocks++
-				} else {
+
+				select {
+				case <-firstBlockInBatchTime.C:
 					nblocks = 0
+					firstBlockInBatchTime.Stop()
+
 					if err = c.adapter.Inject(&batch); err != nil {
 						logrus.Error(err)
 					}
+				default:
+					if nblocks <= limit {
+						batch.BlockNumber = data.BlockNumber
+						batch.BlockSignatures = data.BlockSignatures
+						batch.Datahash = data.Datahash
+						batch.Events = data.Events
+						batch.Channel = data.Channel
+						batch.Prevhash = data.Prevhash
+						batch.Txs = append(batch.Txs, data.Txs...)
+						nblocks++
+					} else {
+						nblocks = 0
+						firstBlockInBatchTime.Stop()
+
+						if err = c.adapter.Inject(&batch); err != nil {
+							logrus.Error(err)
+						}
+					}
+
 				}
+
 			}
 		}(notifier)
 	}
