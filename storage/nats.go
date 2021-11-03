@@ -133,6 +133,7 @@ func (n *Nats) Close() error {
 }
 
 func SubscriptionMgr(
+	ctx context.Context,
 	conn stan.Conn,
 	subject string,
 	cb stan.MsgHandler,
