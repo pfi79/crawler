@@ -225,19 +225,21 @@ func (c *Crawler) StopListenAll() {
 // What and in what form will be stored in the storage is determined by the storage adapter implementation.
 func (c *Crawler) Run() {
 	for _, notifier := range c.notifiers {
-		for blockevent := range notifier {
-			data, err := c.parser.Parse(blockevent.Block)
-			if err != nil {
-				logrus.Error(err)
-				continue
+		go func(notifier <-chan *fab.BlockEvent) {
+			for blockevent := range notifier {
+				data, err := c.parser.Parse(blockevent.Block)
+				if err != nil {
+					logrus.Error(err)
+					continue
+				}
+				if data == nil {
+					continue
+				}
+				if err = c.adapter.Inject(data); err != nil {
+					logrus.Error(err)
+				}
 			}
-			if data == nil {
-				continue
-			}
-			if err = c.adapter.Inject(data); err != nil {
-				logrus.Error(err)
-			}
-		}
+		}(notifier)
 	}
 }
 
