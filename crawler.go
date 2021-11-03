@@ -277,7 +277,9 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 
 					if err = c.adapter.Inject(&batch); err != nil {
 						logrus.Error(err)
+						batch = parser.Data{}
 					}
+					batch = parser.Data{}
 				default:
 					if nblocks <= limit {
 						batch.BlockNumber = data.BlockNumber
