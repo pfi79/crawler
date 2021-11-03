@@ -34,10 +34,13 @@ func NatsConnMonitor(nats *Nats, clusterID string, opts ...stan.Option) {
 			conn, err := stan.Connect(clusterID, clientID, opts...)
 			if err != nil {
 				log.Error(err)
-			} else {
-				log.Infof("connection to the NATS established (client ID: %s)", clientID)
-				nats.Connection = conn
+
+				continue
 			}
+
+			log.Infof("connection to the NATS established (client ID: %s)", clientID)
+
+			nats.Connection = conn
 		}
 	}
 }
@@ -155,16 +158,15 @@ func SubscriptionMgr(
 		for {
 			select {
 			case <-t.C:
-				if sub == nil || (sub != nil && !sub.IsValid()) {
-					if conn.NatsConn() != nil {
-						validSub = false
-						log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
-						sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
-						if err != nil {
-							panic(err)
-						}
-						subptr = &sub
+				if (sub == nil || (sub != nil && !sub.IsValid())) &&
+					conn.NatsConn() != nil {
+					validSub = false
+					log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+					sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
+					if err != nil {
+						panic(err)
 					}
+					subptr = &sub
 				} else {
 					if !validSub {
 						log.Infof("Subscription to %s restored", subject)
