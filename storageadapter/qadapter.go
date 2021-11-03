@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package storageadapter
 
 import (
+	"context"
 	"sync"
 
 	"github.com/newity/crawler/parser"
@@ -31,7 +32,7 @@ func (s *QueueAdapter) Inject(data *parser.Data) error {
 }
 
 func (s *QueueAdapter) Retrieve(topic string) (*parser.Data, error) {
-	value, err := s.storage.Get(topic)
+	value, err := s.storage.Get(context.Background(), topic)
 	if err != nil {
 		return nil, err
 	}
@@ -39,11 +40,17 @@ func (s *QueueAdapter) Retrieve(topic string) (*parser.Data, error) {
 	return Decode(value)
 }
 
-func (s *QueueAdapter) ReadStream(topic string) (<-chan *parser.Data, <-chan error) {
-	stream, errChan := s.storage.GetStream(topic)
-	out, errOutChan := make(chan *parser.Data), make(chan error, 1)
+func (s *QueueAdapter) ReadStream(
+	ctx context.Context,
+	topic string,
+) (<-chan *parser.Data, <-chan error) {
+	var (
+		out        = make(chan *parser.Data)
+		errOutChan = make(chan error)
+		wg         sync.WaitGroup
+	)
 
-	var wg sync.WaitGroup
+	stream, errChan := s.storage.GetStream(ctx, topic)
 
 	wg.Add(1)
 

@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package storageadapter
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/newity/crawler/parser"
@@ -30,7 +31,7 @@ func (s *SimpleAdapter) Inject(data *parser.Data) error {
 }
 
 func (s *SimpleAdapter) Retrieve(blocknum string) (*parser.Data, error) {
-	value, err := s.storage.Get(blocknum)
+	value, err := s.storage.Get(context.Background(), blocknum)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +39,9 @@ func (s *SimpleAdapter) Retrieve(blocknum string) (*parser.Data, error) {
 	return Decode(value)
 }
 
-func (s *SimpleAdapter) ReadStream(_ string) (<-chan *parser.Data, <-chan error) { // blocknum
+func (s *SimpleAdapter) ReadStream(
+	_ context.Context,
+	_ string, // blocknum
+) (<-chan *parser.Data, <-chan error) {
 	return nil, nil
 }

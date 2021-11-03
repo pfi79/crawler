@@ -6,8 +6,10 @@ SPDX-License-Identifier: Apache-2.0
 package crawler
 
 import (
+	"context"
 	"os"
 	"path"
+	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
@@ -146,6 +148,8 @@ func (c *Crawler) Listen(opts ...ListenOpt) error {
 		switch v := opt().(type) {
 		case string:
 			listenType = v
+		case event.ClientOption:
+			clientOpts = append([]event.ClientOption{}, v)
 		case int:
 			fromBlock = uint64(v)
 		}
@@ -196,6 +200,10 @@ func (c *Crawler) ListenerForChannel(channel string) <-chan *fab.BlockEvent {
 func (c *Crawler) StopListenChannel(channel string) {
 	for ch, eventcli := range c.eventCli {
 		if channel == ch {
+			go func() { // dirty hack to force dispatcher handle disconnect event
+				for range c.notifiers[ch] {
+				}
+			}()
 			eventcli.Unregister(c.registrations[ch])
 		}
 	}
@@ -205,6 +213,10 @@ func (c *Crawler) StopListenChannel(channel string) {
 // block events from all channels and closes these channels.
 func (c *Crawler) StopListenAll() {
 	for ch, eventcli := range c.eventCli {
+		go func() { // dirty hack to force dispatcher handle disconnect event
+			for range c.notifiers[ch] {
+			}
+		}()
 		eventcli.Unregister(c.registrations[ch])
 	}
 }
@@ -214,22 +226,90 @@ func (c *Crawler) StopListenAll() {
 // What and in what form will be stored in the storage is determined by the storage adapter implementation.
 func (c *Crawler) Run() {
 	for _, notifier := range c.notifiers {
-		for blockevent := range notifier {
-			data, err := c.parser.Parse(blockevent.Block)
-			if err != nil {
-				logrus.Error(err)
+		go func(notifier <-chan *fab.BlockEvent) {
+			for blockevent := range notifier {
+				data, err := c.parser.Parse(blockevent.Block)
+				if err != nil {
+					logrus.Error(err)
 
-				continue
-			}
+					continue
+				}
 
-			if data == nil {
-				continue
-			}
+				if data == nil {
+					continue
+				}
 
-			if err = c.adapter.Inject(data); err != nil {
-				logrus.Error(err)
+				if err = c.adapter.Inject(data); err != nil {
+					logrus.Error(err)
+				}
 			}
-		}
+		}(notifier)
+	}
+}
+
+// RunBatched works like Run, but collects parsed data into the batch.
+// To form a batch, one of the following conditions must be met:
+// 1) the _limit_ of blocks in the batch is exceeded;
+// 2) a timeout (_timer_) has passed for the formation and sending of the batch.
+func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
+	for _, notifier := range c.notifiers {
+		go func(notifier <-chan *fab.BlockEvent) {
+			var (
+				batch                 parser.Data
+				nblocks               uint32
+				firstBlockInBatchTime *time.Timer
+			)
+
+			for blockevent := range notifier {
+				if nblocks == 0 {
+					firstBlockInBatchTime = time.NewTimer(timer)
+				}
+
+				data, err := c.parser.Parse(blockevent.Block)
+				if err != nil {
+					logrus.Error(err)
+
+					continue
+				}
+
+				if data == nil {
+					continue
+				}
+
+				select {
+				case <-firstBlockInBatchTime.C:
+					nblocks = 0
+
+					firstBlockInBatchTime.Stop()
+
+					if err = c.adapter.Inject(&batch); err != nil {
+						logrus.Error(err)
+
+						batch = parser.Data{}
+					}
+
+					batch = parser.Data{}
+				default:
+					if nblocks <= limit {
+						batch.BlockNumber = data.BlockNumber
+						batch.BlockSignatures = data.BlockSignatures
+						batch.Datahash = data.Datahash
+						batch.Events = data.Events
+						batch.Channel = data.Channel
+						batch.Prevhash = data.Prevhash
+						batch.Txs = append(batch.Txs, data.Txs...)
+						nblocks++
+					} else {
+						nblocks = 0
+						firstBlockInBatchTime.Stop()
+
+						if err = c.adapter.Inject(&batch); err != nil {
+							logrus.Error(err)
+						}
+					}
+				}
+			}
+		}(notifier)
 	}
 }
 
@@ -239,6 +319,6 @@ func (c *Crawler) GetFromStorage(key string) (*parser.Data, error) {
 	return c.adapter.Retrieve(key)
 }
 
-func (c *Crawler) ReadStreamFromStorage(key string) (<-chan *parser.Data, <-chan error) {
-	return c.adapter.ReadStream(key)
+func (c *Crawler) ReadStreamFromStorage(ctx context.Context, key string) (<-chan *parser.Data, <-chan error) {
+	return c.adapter.ReadStream(ctx, key)
 }

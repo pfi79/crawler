@@ -33,7 +33,7 @@ func main() {
 
 	engine, err := crawler.New(
 		"connection.yaml",
-		crawler.WithAutoConnect(USER, ORG),
+		crawler.WithAutoConnect(USER, ORG, nil),
 		crawler.WithStorage(stor),
 		crawler.WithStorageAdapter(storageadapter.NewSimpleAdapter(stor)),
 	)

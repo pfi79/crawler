@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	CHANNEL    = "mychannel"
-	USER       = "User1"
-	ORG        = "Org1"
-	CLUSTER_ID = "testcluster"
-	NATS_URL   = "nats://0.0.0.0:4222"
+	CHANNEL   = "mychannel"
+	USER      = "User1"
+	ORG       = "Org1"
+	ClusterId = "testcluster"
+	NatsUrl   = "nats://0.0.0.0:4222"
 )
 
 var ConnStatuses = map[nats.Status]string{
@@ -49,9 +49,9 @@ func ConnectionLostHandler() func(stan.Conn, error) {
 
 func main() {
 	natsStorage, err := storage.NewNats(
-		CLUSTER_ID,
+		ClusterId,
 		USER,
-		stan.NatsURL(NATS_URL),
+		stan.NatsURL(NatsUrl),
 		stan.MaxPubAcksInflight(10000000),
 		stan.Pings(1, 100),
 		stan.SetConnectionLostHandler(ConnectionLostHandler()),

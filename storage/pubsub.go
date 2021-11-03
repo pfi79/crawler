@@ -92,7 +92,7 @@ func (p *PubSub) Put(topic string, msg []byte) error {
 }
 
 // Get reads one message from the topic and closes channel.
-func (p *PubSub) Get(topic string) ([]byte, error) {
+func (p *PubSub) Get(_ context.Context, topic string) ([]byte, error) {
 	var err error
 
 	ctx := context.Background()
@@ -120,7 +120,7 @@ func (p *PubSub) Get(topic string) ([]byte, error) {
 }
 
 // GetStream reads a stream of messages from topic and writes them to the channel.
-func (p *PubSub) GetStream(topic string) (<-chan []byte, <-chan error) {
+func (p *PubSub) GetStream(_ context.Context, topic string) (<-chan []byte, <-chan error) {
 	var err error
 
 	ch, errch := make(chan []byte), make(chan error)

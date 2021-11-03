@@ -7,8 +7,10 @@ package crawler
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
@@ -115,6 +117,12 @@ const (
 func FromBlock() ListenOpt {
 	return func() interface{} {
 		return ListenFrom
+	}
+}
+
+func WithEventConsumerTimeout(value time.Duration) ListenOpt {
+	return func() interface{} {
+		return event.WithEventConsumerTimeout(value)
 	}
 }
 

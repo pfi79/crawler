@@ -7,7 +7,9 @@ SPDX-License-Identifier: Apache-2.0
 package storage
 
 import (
+	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,23 +23,22 @@ type Nats struct {
 	subscriptions []*stan.Subscription
 }
 
-func NatsConnMonitor(nats *Nats, clusterID, clientID string, opts ...stan.Option) {
+func NatsConnMonitor(nats *Nats, clusterID string, opts ...stan.Option) {
 	t := time.NewTicker(3 * time.Second)
 	for range t.C {
-		if nats.Connection.NatsConn() != nil {
-			continue
+		if nats.Connection == nil || (nats.Connection != nil && nats.Connection.NatsConn() == nil) {
+			log.Warnf("reestablish connection to the NATS")
+
+			clientID := strconv.Itoa(int(time.Now().UnixNano()))
+
+			conn, err := stan.Connect(clusterID, clientID, opts...)
+			if err != nil {
+				log.Error(err)
+			} else {
+				log.Infof("connection to the NATS established (client ID: %s)", clientID)
+				nats.Connection = conn
+			}
 		}
-
-		log.Warnf("reestablish connection to the NATS")
-
-		conn, err := stan.Connect(clusterID, clientID, opts...)
-		if err != nil {
-			log.Error(err)
-		}
-
-		log.Info("connection to the NATS established")
-
-		nats.Connection = conn
 	}
 }
 
@@ -51,7 +52,7 @@ func NewNats(clusterID, clientID string, opts ...stan.Option) (*Nats, error) {
 		Connection: conn,
 	}
 
-	go NatsConnMonitor(n, clusterID, clientID, opts...)
+	go NatsConnMonitor(n, clusterID, opts...)
 
 	return n, nil
 }
@@ -69,10 +70,10 @@ func (n *Nats) Put(topic string, msg []byte) error {
 }
 
 // Get reads one message from the topic and closes channel.
-func (n *Nats) Get(topic string) ([]byte, error) {
+func (n *Nats) Get(ctx context.Context, topic string) ([]byte, error) {
 	var data []byte
 
-	sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
+	sub, err := SubscriptionMgr(ctx, n.Connection, topic, func(m *stan.Msg) {
 		data = m.Data
 		if err := m.Ack(); err != nil {
 			log.Errorf("failed to ack message, %v", err)
@@ -84,7 +85,7 @@ func (n *Nats) Get(topic string) ([]byte, error) {
 }
 
 // GetStream reads a stream of messages from topic and writes them to the channel.
-func (n *Nats) GetStream(topic string) (<-chan []byte, <-chan error) {
+func (n *Nats) GetStream(ctx context.Context, topic string) (<-chan []byte, <-chan error) {
 	ch, errch := make(chan []byte), make(chan error)
 
 	var wg sync.WaitGroup
@@ -92,15 +93,15 @@ func (n *Nats) GetStream(topic string) (<-chan []byte, <-chan error) {
 	wg.Add(1)
 
 	go func() {
-		sub, err := SubscriptionMgr(n.Connection, topic, func(m *stan.Msg) {
+		wg.Done()
+
+		sub, err := SubscriptionMgr(ctx, n.Connection, topic, func(m *stan.Msg) {
 			ch <- m.Data
 			if err := m.Ack(); err != nil {
 				log.Errorf("failed to ack message, %v", err)
 			}
 		}, stan.SetManualAckMode())
 		n.subscriptions = append(n.subscriptions, sub)
-
-		wg.Done()
 
 		if err != nil {
 			errch <- err
@@ -132,6 +133,7 @@ func (n *Nats) Close() error {
 }
 
 func SubscriptionMgr(
+	ctx context.Context,
 	conn stan.Conn,
 	subject string,
 	cb stan.MsgHandler,
@@ -143,28 +145,37 @@ func SubscriptionMgr(
 	}
 
 	subptr := &sub
-	t := time.NewTicker(3 * time.Second)
 
 	var validSub bool
 
+	t := time.NewTicker(3 * time.Second)
+
 	go func() {
-		for range t.C {
-			if !sub.IsValid() {
-				validSub = false
-
-				log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
-
-				sub, err = conn.Subscribe(subject, cb, opts...)
-				if err != nil {
-					panic(err)
+	OuterLoop:
+		for {
+			select {
+			case <-t.C:
+				if sub == nil || (sub != nil && !sub.IsValid()) {
+					if conn.NatsConn() != nil {
+						validSub = false
+						log.Errorf("Subscription to %s is not valid, recreate subcription", subject)
+						sub, err = conn.QueueSubscribe(subject, subject, cb, opts...)
+						if err != nil {
+							panic(err)
+						}
+						subptr = &sub
+					}
+				} else {
+					if !validSub {
+						log.Infof("Subscription to %s restored", subject)
+					}
+					validSub = true
 				}
+			case <-ctx.Done():
+				log.Warnf("stop resubscriber for %s", subject)
+				subptr = nil
 
-				subptr = &sub
-			} else {
-				if !validSub {
-					log.Infof("Subscription to %s restored", subject)
-				}
-				validSub = true
+				break OuterLoop
 			}
 		}
 	}()

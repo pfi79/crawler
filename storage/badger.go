@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package storage
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"strings"
@@ -45,7 +46,7 @@ func (b *Badger) Put(key string, value []byte) error {
 }
 
 // Get retrieves data from BadgerDB using key.
-func (b *Badger) Get(key string) ([]byte, error) {
+func (b *Badger) Get(_ context.Context, key string) ([]byte, error) {
 	var value []byte
 
 	err := b.db.View(func(txn *badger.Txn) error {
@@ -75,6 +76,9 @@ func (b *Badger) Close() error {
 	return b.db.Close()
 }
 
-func (b *Badger) GetStream(_ string) (<-chan []byte, <-chan error) { // key
+func (b *Badger) GetStream(
+	_ context.Context,
+	_ string, // key
+) (<-chan []byte, <-chan error) {
 	return nil, nil
 }
