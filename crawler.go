@@ -45,6 +45,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path"
+	"time"
 )
 
 // Crawler is responsible for fetching info from blockchain
@@ -237,6 +238,45 @@ func (c *Crawler) Run() {
 				}
 				if err = c.adapter.Inject(data); err != nil {
 					logrus.Error(err)
+				}
+			}
+		}(notifier)
+	}
+}
+
+func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
+	for _, notifier := range c.notifiers {
+		go func(notifier <-chan *fab.BlockEvent) {
+			var (
+				batch   parser.Data
+				nblocks uint32
+			)
+			var firstBlockInBatchTime time.Time
+			for blockevent := range notifier {
+				if nblocks == 0 {
+					firstBlockInBatchTime = time.Now()
+				}
+				data, err := c.parser.Parse(blockevent.Block)
+				if err != nil {
+					logrus.Error(err)
+					continue
+				}
+				if data == nil {
+					continue
+				}
+				if nblocks <= limit || (time.Since(firstBlockInBatchTime).Nanoseconds() >= timer.Nanoseconds()) {
+					batch.Txs = append(batch.Txs, data.Txs...)
+					batch.BlockNumber = batch.BlockNumber
+					batch.BlockSignatures = batch.BlockSignatures
+					batch.Datahash = batch.Datahash
+					batch.Events = batch.Events
+					batch.Txs = append(batch.Txs, data.Txs...)
+					nblocks++
+				} else {
+					nblocks = 0
+					if err = c.adapter.Inject(&batch); err != nil {
+						logrus.Error(err)
+					}
 				}
 			}
 		}(notifier)
