@@ -106,6 +106,7 @@ func New(connectionProfile string, opts ...Option) (*Crawler, error) {
 
 	// if no storage adapter is specified, use the default SimpleAdapter
 	if crawl.adapter == nil {
+
 		crawl.adapter = storageadapter.NewSimpleAdapter(crawl.storage)
 	}
 
@@ -253,47 +254,51 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 			var (
 				batch                 []parser.Data
 				nblocks               uint32
-				firstBlockInBatchTime *time.Timer
+				firstBlockInBatchTime = time.NewTimer(timer)
 			)
 
-			for blockevent := range notifier {
-				if nblocks == 0 {
-					firstBlockInBatchTime = time.NewTimer(timer)
-				}
-				data, err := c.parser.Parse(blockevent.Block)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-				if data == nil {
-					continue
-				}
-
+			for {
 				select {
 				case <-firstBlockInBatchTime.C:
 					nblocks = 0
 					firstBlockInBatchTime.Stop()
 
-					if err = c.adapter.InjectBatch(batch); err != nil {
+					if err := c.adapter.InjectBatch(batch); err != nil {
 						logrus.Error(err)
 						batch = nil
 					}
 					batch = nil
-				default:
+
+				case blockevent := <-notifier:
+					data, err := c.parser.Parse(blockevent.Block)
+					if err != nil {
+						logrus.Error(err)
+						continue
+					}
+					if data == nil {
+						continue
+					}
+
+					if nblocks == 0 {
+						firstBlockInBatchTime = time.NewTimer(timer)
+					}
+
 					if nblocks <= limit {
 						batch = append(batch, *data)
 						nblocks++
+						break
 					} else {
 						nblocks = 0
 						firstBlockInBatchTime.Stop()
 
 						if err = c.adapter.InjectBatch(batch); err != nil {
+							batch = nil
 							logrus.Error(err)
 						}
+						batch = nil
 					}
 
 				}
-
 			}
 		}(notifier)
 	}
