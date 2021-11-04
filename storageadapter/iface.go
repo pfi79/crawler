@@ -12,6 +12,7 @@ import (
 
 type StorageAdapter interface {
 	Inject(data *parser.Data) error
+	InjectBatch(data []parser.Data) error
 	Retrieve(key string) (*parser.Data, error)
 	ReadStream(ctx context.Context, key string) (<-chan *parser.Data, <-chan error)
 }

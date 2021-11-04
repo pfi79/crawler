@@ -7,6 +7,7 @@ package storageadapter
 
 import (
 	"context"
+	"errors"
 	"github.com/newity/crawler/parser"
 	"github.com/newity/crawler/storage"
 	"strconv"
@@ -26,6 +27,17 @@ func (s *SimpleAdapter) Inject(data *parser.Data) error {
 		return err
 	}
 	return s.storage.Put(strconv.Itoa(int(data.BlockNumber)), encoded)
+}
+
+func (s *SimpleAdapter) InjectBatch(data []parser.Data) error {
+	if len(data) == 0 {
+		return errors.New("empty slice passed to InjectBatch")
+	}
+	encoded, err := EncodeBatch(data)
+	if err != nil {
+		return err
+	}
+	return s.storage.Put(strconv.Itoa(int(data[len(data)-1].BlockNumber)), encoded)
 }
 
 func (s *SimpleAdapter) Retrieve(blocknum string) (*parser.Data, error) {
