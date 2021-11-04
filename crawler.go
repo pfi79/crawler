@@ -275,7 +275,7 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 						logrus.Error(err)
 						continue
 					}
-					if data == nil {
+					if data == nil || (data != nil && data.Txs == nil && data.Events == nil) {
 						continue
 					}
 
