@@ -270,6 +270,9 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 					batch = nil
 
 				case blockevent := <-notifier:
+					if blockevent == nil {
+						continue
+					}
 					data, err := c.parser.Parse(blockevent.Block)
 					if err != nil {
 						logrus.Error(err)
