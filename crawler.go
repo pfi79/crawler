@@ -260,6 +260,9 @@ func (c *Crawler) RunBatched(limit uint32, timer time.Duration) {
 			for {
 				select {
 				case <-firstBlockInBatchTime.C:
+					if batch == nil {
+						continue
+					}
 					nblocks = 0
 					firstBlockInBatchTime.Stop()
 
