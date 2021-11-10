@@ -23,7 +23,7 @@ type Redis struct {
 	Client redis.UniversalClient
 }
 
-func NewRedis(password string, addrs []string, withTLS bool, rootCAs []string, processingQ, workQ string) (*Redis, error) {
+func NewRedis(password string, addrs []string, withTLS bool, rootCAs []string) (*Redis, error) {
 	var (
 		redisOpts *redis.UniversalOptions
 		client    redis.UniversalClient
