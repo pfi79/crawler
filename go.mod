@@ -4,8 +4,10 @@ go 1.14
 
 require (
 	cloud.google.com/go/pubsub v1.8.2
+	github.com/avast/retry-go/v3 v3.1.1
 	github.com/cloudflare/cfssl v1.5.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2
+	github.com/go-redis/redis/v7 v7.4.1
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.3
 	github.com/hyperledger/fabric-protos-go v0.0.0-20200707132912-fee30f3ccd23
@@ -16,6 +18,6 @@ require (
 	github.com/prometheus/common v0.7.0
 	github.com/sirupsen/logrus v1.7.0
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.7.0
 	google.golang.org/api v0.34.0
 )
