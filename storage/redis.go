@@ -129,7 +129,7 @@ func (r *Redis) Put(topic string, msg []byte) error {
 	return retry.Do(
 		func() error {
 			return r.Client.Watch(func(tx *redis.Tx) error {
-				return tx.LPush(topic, msg, 0).Err()
+				return tx.LPush(topic, msg).Err()
 			}, topic)
 		}, retry.Attempts(300), retry.DelayType(retry.BackOffDelay), retry.MaxDelay(300*time.Millisecond))
 }
